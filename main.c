@@ -435,17 +435,11 @@ void compute_parallel(
   MPI_Comm_size(MPI_COMM_WORLD, &num_cores);
   MPI_Comm_rank(MPI_COMM_WORLD, &core_id);
 
-  double rows_per_core = (double)((double)size / (double)num_cores);
-  if (rows_per_core < 3) {
-    if (core_id == 0) {
-      printf("Core ID %d:\t The number of rows per core is less than three.\n\t");
-      printf("Please reduce the number of cores to be used for this given array size.\n");
-    }
-    MPI_Finalize();
-  }
+  unsigned int rows_per_core = (unsigned int)floor(size / num_cores);
+  unsigned int remainder_rows = size % num_cores;
 
-  int row_idx_start = (size / num_cores) * core_id;
-  int row_idx_end = ((size / num_cores) - 1) + row_idx_start;
+  int row_idx_start = core_id < remainder_rows ? core_id * rows_per_core * 2 : core_id * rows_per_core + remainder_rows;
+  int row_idx_end = core_id < remainder_rows ? row_idx_start + rows_per_core * 2 - 1 : row_idx_start + rows_per_core - 1;
   int num_of_rows = row_idx_end + 1 - row_idx_start;
   int next_core_id = (core_id + 1) % num_cores;
   int prev_core_id = core_id != 0 ? core_id - 1 : num_cores - 1;
@@ -484,6 +478,8 @@ void compute_parallel(
     // however, the cores will not use this row as the edge rows and columns
     // averages are no calculated. This is just a redundant send and receive.
     if (num_cores > 1) {
+      // If the core is an odd ID, then it will wait to receive a row from
+      // its neighboring cores.
       if (core_id % 2 == 1) {
         MPI_Recv(&sub_arr[size * (num_of_rows + 1)], size, MPI_DOUBLE, next_core_id, 1, MPI_COMM_WORLD, &status);
         MPI_Recv(&sub_arr[0], size, MPI_DOUBLE, prev_core_id, 1, MPI_COMM_WORLD, &status);
@@ -491,15 +487,17 @@ void compute_parallel(
         MPI_Send(core_top_row, size, MPI_DOUBLE, prev_core_id, 1, MPI_COMM_WORLD);
         MPI_Send(core_bot_row, size, MPI_DOUBLE, next_core_id, 1, MPI_COMM_WORLD);
       }
+      // If the core is an even ID, then it will send a row to its neighboring
+      // cores.
       if (core_id % 2 == 1) {
         MPI_Send(core_top_row, size, MPI_DOUBLE, prev_core_id, 0, MPI_COMM_WORLD);
         MPI_Send(core_bot_row, size, MPI_DOUBLE, next_core_id, 0, MPI_COMM_WORLD);
       } else {
-        MPI_Recv(&sub_arr[size * (num_of_rows + 1)], size, MPI_DOUBLE, next_core_id, 1, MPI_COMM_WORLD, &status);
-        MPI_Recv(&sub_arr[0], size, MPI_DOUBLE, prev_core_id, 1, MPI_COMM_WORLD, &status);
+        MPI_Recv(&sub_arr[size * (num_of_rows + 1)], size, MPI_DOUBLE, next_core_id, 0, MPI_COMM_WORLD, &status);
+        MPI_Recv(&sub_arr[0], size, MPI_DOUBLE, prev_core_id, 0, MPI_COMM_WORLD, &status);
       }
     }
-
+    // Calculate the averages of the sub array and store them in a new array.
     double *avg_arr = calculate_averages(
       sub_arr,
       num_of_rows,
@@ -510,16 +508,56 @@ void compute_parallel(
       precision
     );
 
+    // Copy the averages to the sub array.
     memcpy(&sub_arr[size], avg_arr, sizeof(double) * size * num_of_rows);
   }
   // Every value within the cores sub array has reached the required level
   // of precision. Therefore, the sub array can be copied to the output array.
   // To do this, the root core must gather every sub array from each core.
 
-  if (core_id == 0) {
-    MPI_Gather(&sub_arr[size], size * num_of_rows, MPI_DOUBLE, *pptr_out_arr, size * num_of_rows, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  // The issue is, some sub arrays are larger than others. Therefore, the
+  // root must gather the larger arrays first, then the smaller ones.
+
+  // For this to be done, the root core gathers the larger arrays first.
+  // Whilst doing so, another core gathers the smaller arrays. Once completed,
+  // a send/receive is sent to the root core containing the gathered smaller arrays.
+
+  if (remainder_rows == 0) {
+    // If there are no remainder rows, then all cores have the same number of rows.
+    // Therefore, the root core can gather all the sub arrays in one go.
+    if (core_id == 0) {
+      MPI_Gather(&sub_arr[size], size * num_of_rows, MPI_DOUBLE, *pptr_out_arr, size * num_of_rows, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    } else {
+      MPI_Gather(&sub_arr[size], size * num_of_rows, MPI_DOUBLE, NULL, size * num_of_rows, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    }
   } else {
-    MPI_Gather(&sub_arr[size], size * num_of_rows, MPI_DOUBLE, NULL, size * num_of_rows, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    // If there are remainder rows, then the root core must gather the larger arrays whilst,
+    // another core gathers the smaller arrays. Once completed, a send/receive is sent to the
+    // root core containing the gathered smaller arrays.
+    if (core_id < remainder_rows) {
+      // Larger Arrays are gathered by the root core.
+      if (core_id == 0) {
+        // Temporarily store the larger arrays in a temporary array.
+        double ptr_temp_out_arr[size * num_of_rows * remainder_rows];
+        MPI_Gather(&sub_arr[size], size * num_of_rows, MPI_DOUBLE, *pptr_out_arr, size * num_of_rows, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        // Receives the smaller arrays from the other core. It immediately stores them in the output array.
+        // This completes the gathering of all the arrays.
+        MPI_Recv(&(*pptr_out_arr[size * num_of_rows * remainder_rows]), size * (num_of_rows - 1) * (num_cores - remainder_rows), MPI_DOUBLE, remainder_rows, 0, MPI_COMM_WORLD, &status);
+      } else {
+        MPI_Gather(&sub_arr[size], size * num_of_rows, MPI_DOUBLE, NULL, size * num_of_rows, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+      }
+    } else {
+      // Smaller Arrays are gathered by the other core.
+      if (core_id == remainder_rows) {
+        // Temporarily store the smaller arrays in a temporary array.
+        double ptr_temp_out_arr[size * num_of_rows * (num_cores - remainder_rows)];
+        MPI_Gather(&sub_arr[size], size * num_of_rows, MPI_DOUBLE, *pptr_out_arr, size * num_of_rows, MPI_DOUBLE, remainder_rows, MPI_COMM_WORLD);
+        // Sends the smaller arrays to the root core.
+        MPI_Send(&ptr_temp_out_arr, size * num_of_rows * (num_cores - remainder_rows), MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
+      } else {
+        MPI_Gather(&sub_arr[size], size * num_of_rows, MPI_DOUBLE, NULL, size * num_of_rows, MPI_DOUBLE, remainder_rows, MPI_COMM_WORLD);
+      }
+    }
   }
 
   // Now that the output array has been populated, MPI can finalize.
