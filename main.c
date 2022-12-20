@@ -25,21 +25,27 @@ void run_static_test(
   unsigned int arr_rows,
   unsigned int num_of_tests,
   unsigned int arr_type,
-  float precision
+  float precision,
+  int argc,
+  char const *argv[]
 );
 
 void run_precision_tests(
   unsigned int arr_rows,
   unsigned int num_of_tests,
   unsigned int arr_type,
-  float precision
+  float precision,
+  int argc,
+  char const *argv[]
 );
 
 void run_arr_size_tests(
   unsigned int arr_rows,
   unsigned int num_of_tests,
   unsigned int arr_type,
-  float precision
+  float precision,
+  int argc,
+  char const *argv[]
 );
 
 int run_tests(
@@ -48,7 +54,9 @@ int run_tests(
   unsigned int num_of_tests,
   float precision,
   double *average_sequential_time,
-  double *average_parallel_time
+  double *average_parallel_time,
+  int argc,
+  char const *argv[]
 );
 
 int run_test(
@@ -56,20 +64,34 @@ int run_test(
   unsigned int arr_type,
   float precision,
   double *sequential_time,
-  double *parallel_time
+  double *parallel_time,
+  int argc,
+  char const *argv[]
 );
 
 void compute_parallel(
   double **pptr_in_arr,
   double **pptr_out_arr,
   unsigned int size,
-  float precision
+  float precision,
+  int argc,
+  char const *argv[]
 );
 
 void compute_sequentially(
   double **pptr_in_arr,
   double **pptr_out_arr,
   unsigned int size,
+  double precision
+);
+
+double *calculate_averages(
+  double *ptr_in_arr,
+  int num_of_rows,
+  int size,
+  int core_id,
+  int num_cores,
+  int *is_precise,
   double precision
 );
 
@@ -113,11 +135,11 @@ int main(int argc, char const *argv[])
   }
 
   if (test_type == 0) {
-    run_static_test(arr_rows, num_of_tests, arr_type, precision);
+    run_static_test(arr_rows, num_of_tests, arr_type, precision, argc, argv);
   } else if (test_type == 1) {
-    run_precision_tests(arr_rows, num_of_tests, arr_type, precision);
+    run_precision_tests(arr_rows, num_of_tests, arr_type, precision, argc, argv);
   } else if (test_type == 2) {
-    run_arr_size_tests(arr_rows, num_of_tests, arr_type, precision);
+    run_arr_size_tests(arr_rows, num_of_tests, arr_type, precision, argc, argv);
   }
 
 
@@ -136,7 +158,9 @@ void run_static_test(
   unsigned int arr_rows,
   unsigned int num_of_tests,
   unsigned int arr_type,
-  float precision
+  float precision,
+  int argc,
+  char const *argv[]
 ) {
   printf("Pass/Fail,\tSequential Time (s),\tParallel Time (s)\n");
   double average_sequential_time = 0.;
@@ -148,7 +172,9 @@ void run_static_test(
     num_of_tests,
     precision,
     &average_sequential_time,
-    &average_parallel_time
+    &average_parallel_time,
+    argc,
+    argv
   );
 
   if (average_has_passed == 0) {
@@ -171,7 +197,9 @@ void run_precision_tests(
   unsigned int arr_rows,
   unsigned int num_of_tests,
   unsigned int arr_type,
-  float precision
+  float precision,
+  int argc,
+  char const *argv[]
 ) {
   printf("Precision,\tPass/Fail,\tSequential Time (s),\tParallel Time (s)\n");
   double max_exponent = fabs(log10(precision));
@@ -188,7 +216,9 @@ void run_precision_tests(
         num_of_tests,
         precision,
         &average_sequential_time,
-        &average_parallel_time
+        &average_parallel_time,
+        argc,
+        argv
       );
 
       printf("%f,\t", precision);
@@ -214,7 +244,9 @@ void run_arr_size_tests(
   unsigned int arr_rows,
   unsigned int num_of_tests,
   unsigned int arr_type,
-  float precision
+  float precision,
+  int argc,
+  char const *argv[]
 ) {
   printf("Array Size,\tPass/Fail,\tSequential Time (s),\tParallel Time (s)\n");
   double max_exponent = fabs(log10(arr_rows));
@@ -231,7 +263,9 @@ void run_arr_size_tests(
         num_of_tests,
         precision,
         &average_sequential_time,
-        &average_parallel_time
+        &average_parallel_time,
+        argc,
+        argv
       );
 
       printf("%d,\t", array_size);
@@ -262,7 +296,9 @@ int run_tests(
   unsigned int num_of_tests,
   float precision,
   double *average_sequential_time,
-  double *average_parallel_time
+  double *average_parallel_time,
+  int argc,
+  char const *argv[]
 ) {
   unsigned int average_has_passed = 1;
 
@@ -275,7 +311,9 @@ int run_tests(
       arr_type,
       precision,
       &sequential_time,
-      &parallel_time
+      &parallel_time,
+      argc,
+      argv
     );
     int average_has_passed = has_passed == 0 ? 0 : average_has_passed;
     *average_sequential_time += sequential_time;
@@ -301,7 +339,9 @@ int run_test(
   unsigned int arr_type,
   float precision,
   double *sequential_time,
-  double *parallel_time
+  double *parallel_time,
+  int argc,
+  char const *argv[]
 ) {
   double sequential_time = 0.;
   double parallel_time = 0.;
@@ -338,7 +378,7 @@ int run_test(
 
   clock_t parallel_time_start = clock();
 
-  compute_parallel(pptr_p_input_arr, pptr_p_output_arr, arr_rows, precision);
+  compute_parallel(pptr_p_input_arr, pptr_p_output_arr, arr_rows, precision, argc, argv);
   ptr_p_input_arr = *pptr_p_input_arr;
   ptr_p_output_arr = *pptr_p_output_arr;
 
@@ -379,9 +419,160 @@ void compute_parallel(
   double **pptr_in_arr,
   double **pptr_out_arr,
   unsigned int size,
-  float precision
+  float precision,
+  int argc,
+  char const *argv[]
 ) {
+  unsigned int num_cores;
+  int core_id;
 
+  MPI_Status status;
+
+  if(MPI_Init(&argc, &argv) != MPI_SUCCESS) {
+    printf("MPI_Init error\n");
+  }
+
+  MPI_Comm_size(MPI_COMM_WORLD, &num_cores);
+  MPI_Comm_rank(MPI_COMM_WORLD, &core_id);
+
+  double rows_per_core = (double)((double)size / (double)num_cores);
+  if (rows_per_core < 3) {
+    if (core_id == 0) {
+      printf("Core ID %d:\t The number of rows per core is less than three.\n\t");
+      printf("Please reduce the number of cores to be used for this given array size.\n");
+    }
+    MPI_Finalize();
+  }
+
+  int row_idx_start = (size / num_cores) * core_id;
+  int row_idx_end = ((size / num_cores) - 1) + row_idx_start;
+  int num_of_rows = row_idx_end + 1 - row_idx_start;
+  int next_core_id = (core_id + 1) % num_cores;
+  int prev_core_id = core_id != 0 ? core_id - 1 : num_cores - 1;
+  int is_precise = 0;
+
+  // Create an array to hold the allocated rows of the input array.
+  // This is padded by one row at the top and another at the bottom
+  // to allow for the core to access the rows above and below it that
+  // are allocated to other cores.
+  double sub_arr[size * (num_of_rows + 2)];
+  memcpy(&sub_arr[size], &(*pptr_in_arr[size * row_idx_start]), sizeof(double) * size * num_of_rows);
+
+  // Creates two arrays to store the top and bottom rows of the core
+  // that are too be sent to the adjacent cores.
+  double core_top_row[size];
+  double core_bot_row[size];
+
+  while (is_precise == 0) {
+    // Make the assumption that all values in the sub_arr have already
+    // met the required precision.
+    is_precise = 1;
+
+    // Copy each cores top and bottom rows to a space in memory
+    // ready to be sent to their neighboring cores.
+    memcpy(core_top_row, &sub_arr[size], sizeof(float) * size);
+    memcpy(core_bot_row, &sub_arr[size * num_of_rows], sizeof(double) * size);
+
+    // If there is only one core, then there is no need to pass messages.
+    // All the even ID cores will send their top and bottom rows to their
+    // neighboring cores whilst the odd ID cores will wait to receive these
+    // rows. Once a core has sent/received a row, they will then with to
+    // receive/send a row. This way, every send has a receive and vice versa
+    // therefore preventing deadlocks.
+
+    // The First core will receive a row from the bottom core and vice versa
+    // however, the cores will not use this row as the edge rows and columns
+    // averages are no calculated. This is just a redundant send and receive.
+    if (num_cores > 1) {
+      if (core_id % 2 == 1) {
+        MPI_Recv(&sub_arr[size * (num_of_rows + 1)], size, MPI_DOUBLE, next_core_id, 1, MPI_COMM_WORLD, &status);
+        MPI_Recv(&sub_arr[0], size, MPI_DOUBLE, prev_core_id, 1, MPI_COMM_WORLD, &status);
+      } else {
+        MPI_Send(core_top_row, size, MPI_DOUBLE, prev_core_id, 1, MPI_COMM_WORLD);
+        MPI_Send(core_bot_row, size, MPI_DOUBLE, next_core_id, 1, MPI_COMM_WORLD);
+      }
+      if (core_id % 2 == 1) {
+        MPI_Send(core_top_row, size, MPI_DOUBLE, prev_core_id, 0, MPI_COMM_WORLD);
+        MPI_Send(core_bot_row, size, MPI_DOUBLE, next_core_id, 0, MPI_COMM_WORLD);
+      } else {
+        MPI_Recv(&sub_arr[size * (num_of_rows + 1)], size, MPI_DOUBLE, next_core_id, 1, MPI_COMM_WORLD, &status);
+        MPI_Recv(&sub_arr[0], size, MPI_DOUBLE, prev_core_id, 1, MPI_COMM_WORLD, &status);
+      }
+    }
+
+    double *avg_arr = calculate_averages(
+      sub_arr,
+      num_of_rows,
+      size,
+      core_id,
+      num_cores,
+      &is_precise,
+      precision
+    );
+
+    memcpy(&sub_arr[size], avg_arr, sizeof(double) * size * num_of_rows);
+  }
+  // Every value within the cores sub array has reached the required level
+  // of precision. Therefore, the sub array can be copied to the output array.
+  // To do this, the root core must gather every sub array from each core.
+
+  if (core_id == 0) {
+    MPI_Gather(&sub_arr[size], size * num_of_rows, MPI_DOUBLE, *pptr_out_arr, size * num_of_rows, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  } else {
+    MPI_Gather(&sub_arr[size], size * num_of_rows, MPI_DOUBLE, NULL, size * num_of_rows, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  }
+
+  // Now that the output array has been populated, MPI can finalize.
+
+  MPI_Finalize();
+}
+
+double *calculate_averages(
+  double *ptr_in_arr,
+  int num_of_rows,
+  int size,
+  int core_id,
+  int num_cores,
+  int *is_precise,
+  double precision
+) {
+  double *ptr_out_arr = calloc(size * num_of_rows, sizeof(double));
+
+  for (int idx = size; idx < (size * num_of_rows + size); idx++) {
+
+    int x = idx % size;
+    int y = (int)floor(idx / size);
+
+    // Ignores the first and last column
+    if (x == 0 || x == (size - 1)) { continue; }
+    // Ignores the first and last row
+    if (y == 1 && core_id == 0) { continue; }
+    if (y == num_of_rows && core_id == num_cores - 1) { continue; }
+
+    // Calculates the average of the four surrounding values
+    double val_1 = ptr_in_arr[idx + 1];
+    double val_2 = ptr_in_arr[idx - 1];
+    double val_3 = ptr_in_arr[idx + size];
+    double val_4 = ptr_in_arr[idx - size];
+
+    double average = (val_1 + val_2 + val_3 + val_4) / 4;
+
+    double current_val = ptr_in_arr[idx];
+
+    // Computes the difference between the current value and the average
+    double difference  = (double)fabs(average - current_val);
+
+    // Checks if the difference meets the required level of precision.
+    // If it does not, then is_precise is set to 0. Else, it is set to
+    // its previous value incase a previous difference did not meet the
+    // required level of precision.
+    *is_precise = difference > precision ? 0 : *is_precise;
+
+    // Stores the average in the output array
+    ptr_out_arr[idx - size] = average;
+  }
+
+  return ptr_out_arr;
 }
 
 /**
