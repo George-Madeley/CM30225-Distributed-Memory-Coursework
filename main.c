@@ -70,8 +70,8 @@ int run_test(
 );
 
 void compute_parallel(
-  double **pptr_in_arr,
-  double **pptr_out_arr,
+  double *ptr_in_arr,
+  double *ptr_out_arr,
   unsigned int size,
   float precision,
   int argc,
@@ -79,8 +79,8 @@ void compute_parallel(
 );
 
 void compute_sequentially(
-  double **pptr_in_arr,
-  double **pptr_out_arr,
+  double *ptr_in_arr,
+  double *ptr_out_arr,
   unsigned int size,
   double precision
 );
@@ -106,9 +106,15 @@ int is_expected_outcome(
   unsigned int size
 );
 
-void print_array(
+void print_array_uniform(
   double *arr, 
   unsigned int size
+);
+
+void print_array(
+  double *arr, 
+  unsigned int rows,
+  unsigned int cols
 );
 
 
@@ -350,27 +356,18 @@ int run_test(
   populate_array(ptr_arr, arr_rows);
   
   double *ptr_s_input_arr  = malloc((arr_rows * arr_rows) * sizeof(double));
-  double *ptr_s_output_arr = malloc((arr_rows * arr_rows) * sizeof(double));
+  double *ptr_s_output_arr = calloc((arr_rows * arr_rows), sizeof(double));
   double *ptr_p_input_arr  = malloc((arr_rows * arr_rows) * sizeof(double));
-  double *ptr_p_output_arr = malloc((arr_rows * arr_rows) * sizeof(double));
+  double *ptr_p_output_arr = calloc((arr_rows * arr_rows), sizeof(double));
 
   memcpy(ptr_s_input_arr , ptr_arr, (arr_rows * arr_rows) * sizeof(double));
-  memcpy(ptr_s_output_arr, ptr_arr, (arr_rows * arr_rows) * sizeof(double));
   memcpy(ptr_p_input_arr , ptr_arr, (arr_rows * arr_rows) * sizeof(double));
-  memcpy(ptr_p_output_arr, ptr_arr, (arr_rows * arr_rows) * sizeof(double));
-  
-  double **pptr_s_input_arr  = &ptr_s_input_arr; 
-  double **pptr_s_output_arr = &ptr_s_output_arr; 
-  double **pptr_p_input_arr  = &ptr_p_input_arr; 
-  double **pptr_p_output_arr = &ptr_p_output_arr;
 
   free(ptr_arr);
 
   clock_t sequential_time_start = clock();
 
-  compute_sequentially(pptr_s_input_arr, pptr_s_output_arr, arr_rows, precision);
-  ptr_s_input_arr = *pptr_s_input_arr;
-  ptr_s_output_arr = *pptr_s_output_arr;
+  compute_sequentially(ptr_s_input_arr, ptr_s_output_arr, arr_rows, precision);
 
   clock_t sequential_time_end = clock();
 
@@ -378,24 +375,18 @@ int run_test(
 
   clock_t parallel_time_start = clock();
 
-  compute_parallel(pptr_p_input_arr, pptr_p_output_arr, arr_rows, precision, argc, argv);
-  ptr_p_input_arr = *pptr_p_input_arr;
-  ptr_p_output_arr = *pptr_p_output_arr;
+  compute_parallel(ptr_p_input_arr, ptr_p_output_arr, arr_rows, precision, argc, argv);
 
   clock_t parallel_time_end = clock();
   
   *parallel_time = (double)(parallel_time_end - parallel_time_start) / CLOCKS_PER_SEC;
 
-  if (print_array == 1) {
-    printf("Input Array:\n");
-    print_array(ptr_p_input_arr, arr_rows);
-    printf("\nOutput Array:\n");
-    print_array(ptr_p_output_arr, arr_rows);  
-    printf("\nExpected Array:\n");
-    print_array(ptr_s_output_arr, arr_rows);
-  }
-
   int has_passed = is_expected_outcome(ptr_p_output_arr, ptr_s_output_arr, arr_rows);
+
+  printf("Sequential Array: \t\n");
+  print_array_uniform(ptr_s_output_arr, arr_rows);
+  printf("Parallel Array: \t\n");
+  print_array_uniform(ptr_p_output_arr, arr_rows);
 
   free(ptr_s_output_arr);
   free(ptr_s_input_arr);
@@ -416,8 +407,8 @@ int run_test(
  * @return (void)
  */
 void compute_parallel(
-  double **pptr_in_arr,
-  double **pptr_out_arr,
+  double *ptr_in_arr,
+  double *ptr_out_arr,
   unsigned int size,
   float precision,
   int argc,
@@ -450,7 +441,7 @@ void compute_parallel(
   // to allow for the core to access the rows above and below it that
   // are allocated to other cores.
   double sub_arr[size * (num_of_rows + 2)];
-  memcpy(&sub_arr[size], &(*pptr_in_arr[size * row_idx_start]), sizeof(double) * size * num_of_rows);
+  memcpy(&sub_arr[size], &(ptr_in_arr[size * row_idx_start]), sizeof(double) * size * num_of_rows);
 
   // Creates two arrays to store the top and bottom rows of the core
   // that are too be sent to the adjacent cores.
@@ -497,6 +488,10 @@ void compute_parallel(
         MPI_Recv(&sub_arr[0], size, MPI_DOUBLE, prev_core_id, 0, MPI_COMM_WORLD, &status);
       }
     }
+
+    printf("Core %d Sub Array: \t\n", core_id);
+    print_array(sub_arr, num_of_rows + 2, size);
+
     // Calculate the averages of the sub array and store them in a new array.
     double *avg_arr = calculate_averages(
       sub_arr,
@@ -510,6 +505,8 @@ void compute_parallel(
 
     // Copy the averages to the sub array.
     memcpy(&sub_arr[size], avg_arr, sizeof(double) * size * num_of_rows);
+
+    free(avg_arr);
   }
   // Every value within the cores sub array has reached the required level
   // of precision. Therefore, the sub array can be copied to the output array.
@@ -526,7 +523,7 @@ void compute_parallel(
     // If there are no remainder rows, then all cores have the same number of rows.
     // Therefore, the root core can gather all the sub arrays in one go.
     if (core_id == 0) {
-      MPI_Gather(&sub_arr[size], size * num_of_rows, MPI_DOUBLE, *pptr_out_arr, size * num_of_rows, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+      MPI_Gather(&sub_arr[size], size * num_of_rows, MPI_DOUBLE, ptr_out_arr, size * num_of_rows, MPI_DOUBLE, 0, MPI_COMM_WORLD);
     } else {
       MPI_Gather(&sub_arr[size], size * num_of_rows, MPI_DOUBLE, NULL, size * num_of_rows, MPI_DOUBLE, 0, MPI_COMM_WORLD);
     }
@@ -539,10 +536,10 @@ void compute_parallel(
       if (core_id == 0) {
         // Temporarily store the larger arrays in a temporary array.
         double ptr_temp_out_arr[size * num_of_rows * remainder_rows];
-        MPI_Gather(&sub_arr[size], size * num_of_rows, MPI_DOUBLE, *pptr_out_arr, size * num_of_rows, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        MPI_Gather(&sub_arr[size], size * num_of_rows, MPI_DOUBLE, ptr_out_arr, size * num_of_rows, MPI_DOUBLE, 0, MPI_COMM_WORLD);
         // Receives the smaller arrays from the other core. It immediately stores them in the output array.
         // This completes the gathering of all the arrays.
-        MPI_Recv(&(*pptr_out_arr[size * num_of_rows * remainder_rows]), size * (num_of_rows - 1) * (num_cores - remainder_rows), MPI_DOUBLE, remainder_rows, 0, MPI_COMM_WORLD, &status);
+        MPI_Recv(&(ptr_out_arr[size * num_of_rows * remainder_rows]), size * (num_of_rows - 1) * (num_cores - remainder_rows), MPI_DOUBLE, remainder_rows, 0, MPI_COMM_WORLD, &status);
       } else {
         MPI_Gather(&sub_arr[size], size * num_of_rows, MPI_DOUBLE, NULL, size * num_of_rows, MPI_DOUBLE, 0, MPI_COMM_WORLD);
       }
@@ -551,7 +548,7 @@ void compute_parallel(
       if (core_id == remainder_rows) {
         // Temporarily store the smaller arrays in a temporary array.
         double ptr_temp_out_arr[size * num_of_rows * (num_cores - remainder_rows)];
-        MPI_Gather(&sub_arr[size], size * num_of_rows, MPI_DOUBLE, *pptr_out_arr, size * num_of_rows, MPI_DOUBLE, remainder_rows, MPI_COMM_WORLD);
+        MPI_Gather(&sub_arr[size], size * num_of_rows, MPI_DOUBLE, ptr_out_arr, size * num_of_rows, MPI_DOUBLE, remainder_rows, MPI_COMM_WORLD);
         // Sends the smaller arrays to the root core.
         MPI_Send(&ptr_temp_out_arr, size * num_of_rows * (num_cores - remainder_rows), MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
       } else {
@@ -593,7 +590,7 @@ double *calculate_averages(
     double val_3 = ptr_in_arr[idx + size];
     double val_4 = ptr_in_arr[idx - size];
 
-    double average = (val_1 + val_2 + val_3 + val_4) / 4;
+    double average = (double)(val_1 + val_2 + val_3 + val_4) / 4.;
 
     double current_val = ptr_in_arr[idx];
 
@@ -624,13 +621,11 @@ double *calculate_averages(
  * @return (void)
  */
 void compute_sequentially(
-  double **pptr_in_arr,
-  double **pptr_out_arr,
+  double *ptr_in_arr,
+  double *ptr_out_arr,
   unsigned int size,
   double precision
 ) {
-  double *in_arr = *pptr_in_arr;
-  double *out_arr = *pptr_out_arr;
   int is_precise = 0;
   while (is_precise == 0) {
     is_precise = 1;
@@ -639,27 +634,23 @@ void compute_sequentially(
         unsigned int index = (j * size) + i;
         if ((i == 0) || (i == (size - 1)) || (j == 0) || (j == (size - 1))) { continue; }
         double accumulator = 0;
-        double val_1 = in_arr[index - 1];
-        double val_2 = in_arr[index + 1];
-        double val_3 = in_arr[index - size];
-        double val_4 = in_arr[index + size];
+        double val_1 = ptr_in_arr[index - 1];
+        double val_2 = ptr_in_arr[index + 1];
+        double val_3 = ptr_in_arr[index - size];
+        double val_4 = ptr_in_arr[index + size];
         accumulator += (val_1 + val_2 + val_3 + val_4);
         double average = accumulator / 4;
-        out_arr[index] = average;
+        ptr_out_arr[index] = average;
 
-        double current_val = in_arr[index];
+        double current_val = ptr_in_arr[index];
         double difference = fabs(current_val - average);
         if (difference >= precision) {
           is_precise = 0;
         }
       }
     }
-    double *temp_arr = out_arr;
-    out_arr = in_arr;
-    in_arr = temp_arr;
+    memcpy(ptr_in_arr, ptr_out_arr, size * size * sizeof(double));
   }
-  *pptr_in_arr = out_arr;
-  *pptr_out_arr = in_arr;
 }
 
 /**
@@ -675,11 +666,7 @@ void populate_array(
   for (unsigned int j = 0; j < size; j++) {
     for (unsigned int i = 0; i < size; i++) {
       unsigned int index = (j * size) + i;
-      if ((j == 0) || (i == 0)) {
-        input_arr[index] = 1.;
-      } else {
-        input_arr[index] = 0.;
-      }
+      input_arr[index] = (double)j;
     }
   }
 };
@@ -736,23 +723,31 @@ int is_expected_outcome(
   return is_same;
 }
 
+void print_array(
+  double *arr,
+  unsigned int rows,
+  unsigned int cols
+) {
+  for (unsigned int j = 0; j < rows; j++) {
+    printf("[");
+    for (unsigned int i = 0; i < cols; i++) {
+      unsigned int index = (j * cols) + i;
+      double value = arr[index];
+      printf(" %f,", value);
+    }
+    printf("]\n");
+  }
+}
+
 /**
  * @brief Prints a given array.
  * 
  * @param arr   (*double) pointer to array.
  * @param size  (int)     size of the array (one-dimension).
  */
-void print_array(
+void print_array_uniform(
   double *arr,
   unsigned int size
 ) {
-  for (unsigned int j = 0; j < size; j++) {
-    printf("[");
-    for (unsigned int i = 0; i < size; i++) {
-      unsigned int index = (j * size) + i;
-      double value = arr[index];
-      printf(" %f,", value);
-    }
-    printf("]\n");
-  }
+  print_array(arr, size, size);
 };
