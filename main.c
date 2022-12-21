@@ -144,7 +144,8 @@ int main(int argc, char **argv)
   } else if (test_type == 2) {
     run_arr_size_tests(size, arr_type, num_of_tests, precision);
   }
-
+  
+  MPI_Finalize();
 
   return 0;
 }
@@ -320,13 +321,15 @@ int run_test(
   
   // Allocate memory for the sequential and parallel arrays
   double *ptr_s_input_arr  = malloc((size * size) * sizeof(double));
-  double *ptr_s_output_arr = calloc((size * size), sizeof(double));
+  double *ptr_s_output_arr = malloc((size * size) * sizeof(double));
   double *ptr_p_input_arr  = malloc((size * size) * sizeof(double));
-  double *ptr_p_output_arr = calloc((size * size), sizeof(double));
+  double *ptr_p_output_arr = malloc((size * size) * sizeof(double));
 
   // Copy the array into the sequential and parallel arrays
   memcpy(ptr_s_input_arr , ptr_arr, (size * size) * sizeof(double));
+  memcpy(ptr_s_output_arr, ptr_arr, (size * size) * sizeof(double));
   memcpy(ptr_p_input_arr , ptr_arr, (size * size) * sizeof(double));
+  memcpy(ptr_p_output_arr, ptr_arr, (size * size) * sizeof(double));
 
   // Free the original array
   free(ptr_arr);
@@ -422,6 +425,8 @@ void compute_parallel(
   double core_top_row[size];
   double core_bot_row[size];
 
+  unsigned int iteration = 0;
+
   while (is_precise == 0) {
     // Make the assumption that all values in the sub_arr have already
     // met the required precision.
@@ -462,8 +467,8 @@ void compute_parallel(
         MPI_Recv(&sub_arr[0], (int)size, MPI_DOUBLE, prev_core_id, 0, MPI_COMM_WORLD, &status);
       }
     }
-    double *avg_arr = calloc(size * num_of_rows, sizeof(double));
-    memcpy(avg_arr, &sub_arr[size], sizeof(double) * size * num_of_rows);
+    double avg_arr[size * num_of_rows];
+    memcpy(&avg_arr, &sub_arr[size], sizeof(double) * size * num_of_rows);
     // Calculate the averages of the sub array and store them in a new array.
     calculate_averages(
       sub_arr,
@@ -476,13 +481,25 @@ void compute_parallel(
       num_cores
     );
 
-    printf("Core %d: is_precise = %d", core_id, is_precise);
+    printf("Iteration %d Core %d: is_precise = %d\n", iteration, core_id, is_precise);
 
     // Copy the averages to the sub array.
     memcpy(&sub_arr[size], avg_arr, sizeof(double) * size * num_of_rows);
 
-    free(avg_arr);
+    // Some cores may have reached the required level of precision before
+    // others. To ensure the cores that have reached the required level of
+    // precision still communicate with their neighboring cores, the root
+    // core must gather the is_precise values from each core, use a MIN
+    // to check if all cores have reached the required level of precision
+    // and then broadcast the result to all cores.
+    unsigned int global_is_precise = 0;
+    MPI_Reduce(&is_precise, &global_is_precise, 1, MPI_UNSIGNED, MPI_MIN, 0, MPI_COMM_WORLD);
+    is_precise = global_is_precise == 1 ? 1 : 0;
+    MPI_Bcast(&is_precise, 1, MPI_UNSIGNED, 0, MPI_COMM_WORLD);
+
+    iteration++;
   }
+  printf("Core %d: Finished\n", core_id);
   // Every value within the cores sub array has reached the required level
   // of precision. Therefore, the sub array can be copied to the output array.
   // To do this, the root core must gather every sub array from each core.
@@ -533,9 +550,9 @@ void compute_parallel(
     }
   }
 
-  // Now that the output array has been populated, MPI can finalize.
+  MPI_Bcast(ptr_out_arr, (int)(size * size), MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
-  MPI_Finalize();
+  printf("Core %d: Finished Gathering\n", core_id);
 }
 
 void calculate_averages(
