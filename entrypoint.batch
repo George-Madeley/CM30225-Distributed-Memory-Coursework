@@ -10,6 +10,7 @@
  
 # Set the number of nodes and partition
 #SBATCH --nodes=1
+#SBATCH --ntasks-per-node=4
 #SBATCH --partition=teaching
  
 # Mail alert at start, end and abortion of execution
@@ -19,4 +20,4 @@
 #SBATCH --mail-user=gm768@bath.ac.uk
 
 # Run the application
-./main 44 100 0.01 100 0
+mpirun ./main 12 1 0 1 0
