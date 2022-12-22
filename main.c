@@ -25,6 +25,7 @@ void run_static_test(
   unsigned int const size,
   unsigned int const arr_type,
   unsigned int const num_of_tests,
+  unsigned int const can_print,
   double const precision
 );
 
@@ -32,6 +33,7 @@ void run_precision_tests(
   unsigned int const size,
   unsigned int const arr_type,
   unsigned int const num_of_tests,
+  unsigned int const can_print,
   double const precision
 );
 
@@ -39,6 +41,7 @@ void run_arr_size_tests(
   unsigned int const size,
   unsigned int const arr_type,
   unsigned int const num_of_tests,
+  unsigned int const can_print,
   double const precision
 );
 
@@ -46,6 +49,7 @@ int run_tests(
   unsigned int const size,
   unsigned int const arr_type,
   unsigned int const num_of_tests,
+  unsigned int const can_print,
   double *average_parallel_time,
   double *average_sequential_time,
   double const precision
@@ -54,6 +58,7 @@ int run_tests(
 int run_test(
   unsigned int const size,
   unsigned int const arr_type,
+  unsigned int const can_print,
   double *parallel_time,
   double *sequential_time,
   double const precision
@@ -91,7 +96,8 @@ void populate_array(
 int do_arrays_match(
   double *arr_1,
   double *arr_2,
-  unsigned int const size
+  unsigned int const size,
+  unsigned int const can_print
 );
 
 void print_array_uniform(
@@ -121,6 +127,7 @@ int main(int argc, char **argv)
   unsigned int const test_type = (unsigned int)atoi(argv[3]);
   unsigned int const num_of_tests = (unsigned int)atoi(argv[4]);
   unsigned int const arr_type = (unsigned int)atoi(argv[5]);
+  unsigned int const can_print = (unsigned int)atoi(argv[6]);
 
   int rc = MPI_Init(&argc, &argv);
   if (rc != MPI_SUCCESS) {
@@ -129,11 +136,11 @@ int main(int argc, char **argv)
   }
 
   if (test_type == 0) {
-    run_static_test(size, arr_type, num_of_tests, precision);
+    run_static_test(size, arr_type, num_of_tests, can_print, precision);
   } else if (test_type == 1) {
-    run_precision_tests(size, arr_type, num_of_tests, precision);
+    run_precision_tests(size, arr_type, num_of_tests, can_print, precision);
   } else if (test_type == 2) {
-    run_arr_size_tests(size, arr_type, num_of_tests, precision);
+    run_arr_size_tests(size, arr_type, num_of_tests, can_print, precision);
   }
   
   MPI_Finalize();
@@ -146,13 +153,14 @@ void run_static_test(
   unsigned int const size,
   unsigned int const arr_type,
   unsigned int const num_of_tests,
+  unsigned int const can_print,
   double const precision
 ) {
   int core_id;
   MPI_Comm_rank(MPI_COMM_WORLD, &core_id);
 
   if (core_id == 0) {
-    printf("Size,\tArr Type,\tPrecision,\tPass/Fail,\tSequential Time (s),\tParallel Time (s)\n");
+    printf("Num of Cores,\tSize,\tArr Type,\tPrecision,\tPass/Fail,\tSequential Time (s),\tParallel Time (s)\n");
   }
 
   double average_sequential_time = 0.;
@@ -162,13 +170,16 @@ void run_static_test(
     size,
     arr_type,
     num_of_tests,
+    can_print,
     &average_parallel_time,
     &average_sequential_time,
     precision
   );
 
+  int num_cores;
+  MPI_Comm_size(MPI_COMM_WORLD, &num_cores);
   if (core_id == 0) {
-    printf("%d,\t%d,\t%f,\t", size, arr_type, precision);
+    printf("%d,\t%d,\t%d,\t%f,\t", num_cores, size, arr_type, precision);
     if (average_has_passed == 0) {
       printf("FAILED,\t");
     } else {
@@ -183,13 +194,14 @@ void run_precision_tests(
   unsigned int const size,
   unsigned int const arr_type,
   unsigned int const num_of_tests,
+  unsigned int const can_print,
   double const precision
 ) {
   int core_id;
   MPI_Comm_rank(MPI_COMM_WORLD, &core_id);
 
   if (core_id == 0) {
-    printf("Size,\tArr Type,\tPrecision,\tPass/Fail,\tSequential Time (s),\tParallel Time (s)\n");
+    printf("Num of Cores,\tSize,\tArr Type,\tPrecision,\tPass/Fail,\tSequential Time (s),\tParallel Time (s)\n");
   }
 
   double max_exponent = fabs(log10(precision));
@@ -204,13 +216,16 @@ void run_precision_tests(
         size,
         arr_type,
         num_of_tests,
+        can_print,
         &average_parallel_time,
         &average_sequential_time,
         var_precision
       );
 
+      int num_cores;
+      MPI_Comm_size(MPI_COMM_WORLD, &num_cores);
       if (core_id == 0) {
-        printf("%d,\t%d,\t%f,\t", size, arr_type, var_precision);
+        printf("%d,\t%d,\t%d,\t%f,\t", num_cores, size, arr_type, var_precision);
         if (average_has_passed == 0) {
           printf("FAILED,\t");
         } else {
@@ -227,19 +242,22 @@ void run_arr_size_tests(
   unsigned int const size,
   unsigned int const arr_type,
   unsigned int const num_of_tests,
+  unsigned int const can_print,
   double const precision
 ) {
   int core_id;
   MPI_Comm_rank(MPI_COMM_WORLD, &core_id);
 
   if (core_id == 0) {
-    printf("Size,\tArr Type,\tPrecision,\tPass/Fail,\tSequential Time (s),\tParallel Time (s)\n");
+    printf("Num of Cores,\tSize,\tArr Type,\tPrecision,\tPass/Fail,\tSequential Time (s),\tParallel Time (s)\n");
   }
 
   double max_exponent = fabs(log10(size));
   for(double exponent = 1; exponent <= max_exponent; exponent++) {
     for (unsigned int i = 1; i < 10; i ++) {
       unsigned int array_size = i * (unsigned int)pow(10, exponent);
+
+      if (array_size > size) { break; }
 
       double average_sequential_time = 0.;
       double average_parallel_time = 0.;
@@ -248,13 +266,16 @@ void run_arr_size_tests(
         array_size,
         arr_type,
         num_of_tests,
+        can_print,
         &average_parallel_time,
         &average_sequential_time,
         precision
       );
 
+      int num_cores;
+      MPI_Comm_size(MPI_COMM_WORLD, &num_cores);
       if (core_id == 0) {
-        printf("%d,\t%d,\t%f,\t", array_size, arr_type, precision);
+        printf("%d,\t%d,\t%d,\t%f,\t", num_cores, array_size, arr_type, precision);
         if (average_has_passed == 0) {
           printf("FAILED,\t");
         } else {
@@ -271,6 +292,7 @@ int run_tests(
   unsigned int const size,
   unsigned int const arr_type,
   unsigned int const num_of_tests,
+  unsigned int const can_print,
   double *average_parallel_time,
   double *average_sequential_time,
   double const precision
@@ -284,6 +306,7 @@ int run_tests(
     int has_passed = run_test(
       size,
       arr_type,
+      can_print,
       &parallel_time,
       &sequential_time,
       precision
@@ -301,6 +324,7 @@ int run_tests(
 int run_test(
   unsigned int const size,
   unsigned int const arr_type,
+  unsigned int const can_print,
   double *parallel_time,
   double *sequential_time,
   double const precision
@@ -367,14 +391,14 @@ int run_test(
   }
   MPI_Bcast(sequential_time, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
-  if (core_id == 0) {
-    printf("Sequential Array: \t\n");
-    print_array_uniform(ptr_s_output_arr, size);
-    printf("Parallel Array: \t\n");
-    print_array_uniform(ptr_p_output_arr, size);
-  }
+  int has_passed = do_arrays_match(ptr_p_output_arr, ptr_s_output_arr, size, can_print);
 
-  int has_passed = do_arrays_match(ptr_p_output_arr, ptr_s_output_arr, size);
+  if (core_id == 0 && can_print) {
+    printf("Sequential Output:\n");
+    print_array(ptr_s_output_arr, size, size);
+    printf("Parallel Output:\n");
+    print_array(ptr_p_output_arr, size, size);
+  }
 
   free(ptr_s_output_arr);
   free(ptr_s_input_arr);
@@ -564,40 +588,32 @@ void calculate_averages(
 
 
     // Ignores the first and last column
-    if (x == 0 || x == (size - 1)) { continue; }
+    if ((x == 0) || (x == (size - 1))) { continue; }
     // Ignores the first and last row
     if (y == 1 && core_id == 0) { continue; }
     if (y == num_of_rows && core_id == num_cores - 1) { continue; }
 
     // Calculates the average of the four surrounding values
-    double val_1 = ptr_in_arr[idx + 1];
-    double val_2 = ptr_in_arr[idx - 1];
-    double val_3 = ptr_in_arr[idx + size];
-    double val_4 = ptr_in_arr[idx - size];
-
-    // There is an error here. The average is not being calculated correctly.
-    // For relatively large values (>>0.002), the average is being calculated
-    // correctly. However, for smaller values, the average is not being calculated
-    // correctly. This is not due to type casting and other tests have proven this.
-    // The cause of the error is unknown. However, the error is not significant
-    // as the averages being calculated are relatively small.
-
-    double average = (double)(val_1 + val_2 + val_3 + val_4) / 4.;
-
-    double current_val = ptr_in_arr[idx];
+    double accumulator = 0;
+    double val_1 = ptr_in_arr[idx - 1];
+    double val_2 = ptr_in_arr[idx + 1];
+    double val_3 = ptr_in_arr[idx - size];
+    double val_4 = ptr_in_arr[idx + size];
+    
+    accumulator += (val_1 + val_2 + val_3 + val_4);
+    double average = accumulator / 4.;
+    ptr_out_arr[idx - size] = average;
 
 
     // Computes the difference between the current value and the average
-    double difference  = (double)fabs(average - current_val);
+    double current_val = ptr_in_arr[idx];
+    double difference = fabs(current_val - average);
 
     // Checks if the difference meets the required level of precision.
     // If it does not, then is_precise is set to 0. Else, it is set to
     // its previous value incase a previous difference did not meet the
     // required level of precision.
-    *is_precise = difference > precision ? 0 : *is_precise;
-
-    // Stores the average in the output array
-    ptr_out_arr[idx - size] = average;
+    *is_precise = difference >= precision ? 0 : *is_precise;
   }
 }
 
@@ -700,19 +716,40 @@ void populate_array(
 int do_arrays_match(
   double *arr_1,
   double *arr_2,
-  unsigned int const size
+  unsigned int const size,
+  unsigned int const can_print
 ) {
+  int core_id;
+  MPI_Comm_rank(MPI_COMM_WORLD, &core_id);
+  if (can_print && (core_id == 0)) {
+    printf("Checking if arrays match...\n");
+  }
   int is_same = 1;
   for (unsigned int j = 0; j < size; j++) {
     for (unsigned int i = 0; i < size; i++) {
       unsigned int index = (j * size) + i;
-      if (arr_2[index] != arr_1[index]) {
+
+      // There is an error here that causes the two values not to match.
+      // When printing the values, they are the same. However, when
+      // subtracting them, the result is not 0. Again, printing the difference
+      // shows that it is 0. The cause of the error is unknown. As the error is
+      // smaller than the number of significant figures being printed, it is
+      // not and major issue.
+
+      // To solve this, the difference is rounded to 6 decimal places. This
+      // ensures that the difference is 0.000000, which is the same as the
+      // difference being 0. This is not a good solution, but it is the best
+      // that can be done at this time.
+
+      double difference = arr_1[index] - arr_2[index];
+      // rounds to 6 decimal places
+      double rounded_diff = round(difference * 1000000) / 1000000;
+      if (arr_1[index] != arr_2[index]) {
         is_same = 0;
-        break;
+        if (can_print && (core_id == 0)) {
+          printf("NO MATCH y: %d x: %d. Expected %f, got %f. Difference %f.\n", j, i, arr_2[index], arr_1[index], difference);
+        }
       }
-    }
-    if (is_same == 0) {
-      break;
     }
   }
   return is_same;
