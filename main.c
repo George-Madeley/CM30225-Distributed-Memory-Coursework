@@ -21,6 +21,17 @@
 #include <math.h>
 #include <time.h>
 
+
+/**
+ * @brief Runs a test with a given size, array type, number of tests, and
+ *       precision.
+ * 
+ * @param size          The size of the array.
+ * @param arr_type      The type of array to use.
+ * @param num_of_tests  The number of tests to conduct.
+ * @param can_print     Whether or not to print the arrays.
+ * @param precision     The precision to use.
+ */
 void run_static_test(
   unsigned int const size,
   unsigned int const arr_type,
@@ -29,6 +40,17 @@ void run_static_test(
   double const precision
 );
 
+/**
+ * @brief Runs a test with a given size, array type, number of tests, and
+ *        precision. The precision is varied from 0.9 to the given level of
+ *        precision. The average time taken for each precision is printed.
+ * 
+ * @param size          The size of the array.
+ * @param arr_type      The type of array to use.
+ * @param num_of_tests  The number of tests to conduct.
+ * @param can_print     Whether or not to print the arrays.
+ * @param precision     The precision to use.
+ */
 void run_precision_tests(
   unsigned int const size,
   unsigned int const arr_type,
@@ -37,6 +59,16 @@ void run_precision_tests(
   double const precision
 );
 
+/**
+ * @brief Runs a test with a given size, array type, number of tests, and
+ *       precision. The size of the array is varied from 10 to the given size.
+ * 
+ * @param size          The size of the array.
+ * @param arr_type      The type of array to use.
+ * @param num_of_tests  The number of tests to conduct.
+ * @param can_print     Whether or not to print the arrays.
+ * @param precision     The precision to use.
+ */
 void run_arr_size_tests(
   unsigned int const size,
   unsigned int const arr_type,
@@ -45,6 +77,23 @@ void run_arr_size_tests(
   double const precision
 );
 
+/**
+ * @brief Runs a given number of tests with a given size, array type, number of
+ *        tests, and precision. Each test is timed at the average time is
+ *        calculated.
+ * 
+ * @param size                      The size of the array.
+ * @param arr_type                  The type of array to use.
+ * @param num_of_tests              The number of tests to conduct.
+ * @param can_print                 Whether or not to print the arrays.
+ * @param average_parallel_time     The average time taken for the parallel
+ *                                  version of the algorithm.                     
+ * @param average_sequential_time   The average time taken for the sequential
+ *                                  version of the algorithm.
+ * @param precision                 The precision to use.
+ * 
+ * @return int 0 if the arrays match, 1 otherwise. 
+ */
 int run_tests(
   unsigned int const size,
   unsigned int const arr_type,
@@ -55,6 +104,20 @@ int run_tests(
   double const precision
 );
 
+/**
+ * @brief Runs a single test with a given size, array type, number of tests, and
+ *        precision. The test is timed and the time taken is returned.
+ * 
+ * @param size            The size of the array.
+ * @param arr_type        The type of array to use.
+ * @param can_print       Whether or not to print the arrays.
+ * @param parallel_time   The time taken for the parallel version of the algorithm.
+ * @param sequential_time The time taken for the sequential version of the
+ *                        algorithm.
+ * @param precision       The precision to use.
+ * 
+ * @return int 0 if the arrays match, 1 otherwise. 
+ */
 int run_test(
   unsigned int const size,
   unsigned int const arr_type,
@@ -64,6 +127,17 @@ int run_test(
   double const precision
 );
 
+/**
+ * @brief Computes the average of four neighboring cells for each element in a
+ *        2D-array. Repeats this process until the difference between the
+ *        previous average and current average is less than a given level of
+ *        g_precision.
+ * 
+ * @param ptr_in_arr  A pointer to the input array.
+ * @param ptr_out_arr A pointer to the output array.
+ * @param precision   The precision to use.
+ * @param size        The size of the array.
+ */
 void compute_parallel(
   double *ptr_in_arr,
   double *ptr_out_arr,
@@ -71,6 +145,17 @@ void compute_parallel(
   unsigned int const size
 );
 
+/**
+ * @brief Computes the average of four neighboring cells for each element in a
+ *        2D-array. Repeats this process until the difference between the
+ *        previous average and current average is less than a given level of
+ *        g_precision.
+ * 
+ * @param ptr_in_arr  A pointer to the input array.
+ * @param ptr_out_arr A pointer to the output array.
+ * @param size        The size of the array.
+ * @param precision   The precision to use.
+ */
 void compute_sequentially(
   double *ptr_in_arr,
   double *ptr_out_arr,
@@ -78,6 +163,18 @@ void compute_sequentially(
   double const precision
 );
 
+/**
+ * @brief Computes the average of four neighboring cells for each element in a
+ *        2D-array.
+ * 
+ * @param ptr_in_arr  A pointer to the input array.
+ * @param ptr_out_arr A pointer to the output array.
+ * @param precision   The precision to use.
+ * @param is_precise  A pointer to an array of flags indicating whether or not
+ *                    the average for each element is precise.
+ * @param num_of_rows The number of rows in the array.
+ * @param size        The size of the array.
+ */
 void calculate_averages(
   double *ptr_in_arr,
   double *ptr_out_arr,
@@ -87,12 +184,29 @@ void calculate_averages(
   unsigned int const size
 );
 
+/**
+ * @brief Populates an array based on the given array type.
+ * 
+ * @param input_arr A pointer to the array to populate.
+ * @param size      The size of the array.
+ * @param type      The type of array to use.
+ */
 void populate_array(
   double *input_arr,
   unsigned int const size,
   unsigned int const type
 );
 
+/**
+ * @brief Compares two arrays and returns 1 if they match, 0 otherwise.
+ * 
+ * @param arr_1       A pointer to the first array.
+ * @param arr_2       A pointer to the second array.
+ * @param size        The size of the arrays.
+ * @param can_print   Whether or not to print the arrays.
+ * 
+ * @return int        1 if the arrays match, 0 otherwise.
+ */
 int do_arrays_match(
   double *arr_1,
   double *arr_2,
@@ -100,11 +214,24 @@ int do_arrays_match(
   unsigned int const can_print
 );
 
+/**
+ * @brief Prints an array.
+ * 
+ * @param arr   A pointer to the array.
+ * @param size  The size of the array.
+ */
 void print_array_uniform(
   double *arr, 
   unsigned int const size
 );
 
+/**
+ * @brief Prints a 2D-array.
+ * 
+ * @param arr   A pointer to the array.
+ * @param cols  The number of columns in the array.
+ * @param rows  The number of rows in the array.
+ */
 void print_array(
   double *arr, 
   unsigned int const cols,
@@ -117,11 +244,13 @@ void print_array(
 
 int main(int argc, char **argv)
 {
+  // Check for valid command line arguments.
   if (argc < 6) {
     printf("Invalid Command Line Arguments");
     exit(-1);
   }
 
+  // Get command line arguments.
   unsigned int const size = (unsigned int)atoi(argv[1]);
   double const precision = (double)atof(argv[2]);
   unsigned int const test_type = (unsigned int)atoi(argv[3]);
@@ -129,20 +258,30 @@ int main(int argc, char **argv)
   unsigned int const arr_type = (unsigned int)atoi(argv[5]);
   unsigned int const can_print = (unsigned int)atoi(argv[6]);
 
+  // Initialize MPI and check for errors.
   int rc = MPI_Init(&argc, &argv);
   if (rc != MPI_SUCCESS) {
     printf("Error starting MPI program. Terminating.\n");
     MPI_Abort(MPI_COMM_WORLD, rc);
   }
 
+  // Run the appropriate test based on the test type.
   if (test_type == 0) {
+    // This will run a single test a given number of times.
     run_static_test(size, arr_type, num_of_tests, can_print, precision);
   } else if (test_type == 1) {
+    // This will run a single test with a range of precisions starting at 0.1
+    // and ending at the given precision. The size will vary logarithmically.
+    // A given number of tests will be run for each precision.
     run_precision_tests(size, arr_type, num_of_tests, can_print, precision);
   } else if (test_type == 2) {
+    // This will run a single test with a range of sizes starting at 10 and
+    // ending at the given size. The size will vary logarithmically. A given
+    // number of tests will be run for each size.
     run_arr_size_tests(size, arr_type, num_of_tests, can_print, precision);
   }
   
+  // Finalize MPI.
   MPI_Finalize();
 
   return 0;
@@ -156,13 +295,18 @@ void run_static_test(
   unsigned int const can_print,
   double const precision
 ) {
+
+  // Get the core id so that only core 0 prints the results instead of multiple
+  // cores printing the same results.
   int core_id;
   MPI_Comm_rank(MPI_COMM_WORLD, &core_id);
 
+  // Print the header for the results.
   if (core_id == 0) {
     printf("Num of Cores,\tSize,\tArr Type,\tPrecision,\tPass/Fail,\tSequential Time (s),\tParallel Time (s)\n");
   }
 
+  // Run the tests and get the average sequential and parallel times.
   double average_sequential_time = 0.;
   double average_parallel_time = 0.;
 
@@ -176,6 +320,7 @@ void run_static_test(
     precision
   );
 
+  // Print the results.
   int num_cores;
   MPI_Comm_size(MPI_COMM_WORLD, &num_cores);
   if (core_id == 0) {
@@ -197,18 +342,24 @@ void run_precision_tests(
   unsigned int const can_print,
   double const precision
 ) {
+  // Get the core id so that only core 0 prints the results instead of multiple
+  // cores printing the same results.
   int core_id;
   MPI_Comm_rank(MPI_COMM_WORLD, &core_id);
 
+  // Print the header for the results.
   if (core_id == 0) {
     printf("Num of Cores,\tSize,\tArr Type,\tPrecision,\tPass/Fail,\tSequential Time (s),\tParallel Time (s)\n");
   }
 
+  // Run the tests for a range of precisions.
   double max_exponent = fabs(log10(precision));
   for(double exponent = 1; exponent <= max_exponent; exponent++) {
     for (double i = 9; i > 0; i--) {
+      // Calculate the precision for this test.
       double var_precision = i / pow(10., exponent);
 
+      // Run the tests and get the average sequential and parallel times.
       double average_sequential_time = 0.;
       double average_parallel_time = 0.;
 
@@ -222,6 +373,7 @@ void run_precision_tests(
         var_precision
       );
 
+      // Print the results.
       int num_cores;
       MPI_Comm_size(MPI_COMM_WORLD, &num_cores);
       if (core_id == 0) {
@@ -245,20 +397,28 @@ void run_arr_size_tests(
   unsigned int const can_print,
   double const precision
 ) {
+  // Get the core id so that only core 0 prints the results instead of multiple
+  // cores printing the same results.
   int core_id;
   MPI_Comm_rank(MPI_COMM_WORLD, &core_id);
 
+  // Print the header for the results.
   if (core_id == 0) {
     printf("Num of Cores,\tSize,\tArr Type,\tPrecision,\tPass/Fail,\tSequential Time (s),\tParallel Time (s)\n");
   }
 
+  // Run the tests for a range of array sizes.
   double max_exponent = fabs(log10(size));
   for(double exponent = 1; exponent <= max_exponent; exponent++) {
     for (unsigned int i = 1; i < 10; i ++) {
+      // Calculate the array size for this test.
       unsigned int array_size = i * (unsigned int)pow(10, exponent);
 
+      // If the array size is greater than the size specified, break out of the
+      // loop. This is so that the array size does not exceed the size specified.
       if (array_size > size) { break; }
 
+      // Run the tests and get the average sequential and parallel times.
       double average_sequential_time = 0.;
       double average_parallel_time = 0.;
 
@@ -272,6 +432,7 @@ void run_arr_size_tests(
         precision
       );
 
+      // Print the results.
       int num_cores;
       MPI_Comm_size(MPI_COMM_WORLD, &num_cores);
       if (core_id == 0) {
@@ -297,9 +458,14 @@ int run_tests(
   double *average_sequential_time,
   double const precision
 ) {
+  // Assume that the tests have passed. This will be overwritten if any of the
+  // tests fail. If no tests fail, then the value will remain 1 hence the tests
+  // have passed.
   int average_has_passed = 1;
 
+  // Run the tests a given number of times.
   for(unsigned int test_num = 0; test_num < num_of_tests; test_num++) {
+    // Run the test and get the sequential and parallel times.
     double sequential_time = 0.;
     double parallel_time = 0.;
     
@@ -311,10 +477,14 @@ int run_tests(
       &sequential_time,
       precision
     );
+    // If any of the tests fail, then the average has failed.
     average_has_passed = has_passed == 0 ? 0 : average_has_passed;
+    // Add the sequential and parallel times to the average sequential and
     *average_sequential_time += sequential_time;
     *average_parallel_time += parallel_time;
   }
+  // Divide the average sequential and parallel times by the number of tests to get
+  // the average sequential and parallel times.
   *average_sequential_time /= num_of_tests;
   *average_parallel_time /= num_of_tests;
   return average_has_passed;
@@ -349,12 +519,16 @@ int run_test(
   // Free the original array
   free(ptr_arr);
 
+  // Get the core rank and the number of cores so we can get an more accurate
+  // time for the parallel and sequential algorithms.
   int core_id;
   int num_cores;
   MPI_Comm_rank(MPI_COMM_WORLD, &core_id);
   MPI_Comm_size(MPI_COMM_WORLD, &num_cores);
 
-  // Run the parallel algorithm
+  // Run the parallel algorithm first as there will be less variance in the
+  // start time for each core as less code is executed before the parallel
+  // algorithm is run.
   double parallel_time_start = (double)clock();
   compute_parallel(ptr_p_input_arr, ptr_p_output_arr, precision, size);
   double parallel_time_end = (double)clock();
@@ -391,8 +565,11 @@ int run_test(
   }
   MPI_Bcast(sequential_time, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
+  // Check if the sequential and parallel algorithms have produced the same
+  // output.
   int has_passed = do_arrays_match(ptr_p_output_arr, ptr_s_output_arr, size, can_print);
 
+  // Prints the sequential and parallel arrays.
   if (core_id == 0 && can_print) {
     printf("Sequential Output:\n");
     print_array(ptr_s_output_arr, size, size);
@@ -400,11 +577,14 @@ int run_test(
     print_array(ptr_p_output_arr, size, size);
   }
 
+  // Free the memory
   free(ptr_s_output_arr);
   free(ptr_s_input_arr);
   free(ptr_p_input_arr);
   free(ptr_p_output_arr);
 
+  // Return whether the sequential and parallel algorithms have produced the
+  // same output.
   return has_passed;
 }
 
@@ -415,7 +595,8 @@ void compute_parallel(
   double precision,
   unsigned int size
 ) {
-  
+  // Get the core rank and the number of cores so we can split the array
+  // between the cores.
   int core_id;
   int num_cores;
   MPI_Comm_rank(MPI_COMM_WORLD, &core_id);
@@ -423,13 +604,20 @@ void compute_parallel(
 
   MPI_Status status;
 
+  // Calculate the minimum number of rows that each core will be responsible
+  // for.
   unsigned int rows_per_core = (unsigned int)floor(size / (unsigned int)num_cores);
+  // Calculate the number of rows that will be left over.
   unsigned int remainder_rows = size % (unsigned int)num_cores;
+  // Calculate the start and end row for this core.
   unsigned int start_row = (unsigned int)core_id < remainder_rows ? (unsigned int)core_id * rows_per_core * 2 : (unsigned int)core_id * rows_per_core + remainder_rows;
   unsigned int end_row = (unsigned int)core_id < remainder_rows ? start_row + rows_per_core * 2 - 1 : start_row + rows_per_core - 1;
+  // Calculate the number of rows this core will be responsible for.
   unsigned int num_of_rows = end_row + 1 - start_row;
+  // Calculate the core id of the core above and below this core.
   int next_core_id = (core_id + 1) % num_cores;
   int prev_core_id = core_id != 0 ? core_id - 1 : num_cores - 1;
+  // Calculate the number of rows that the core above and below this core
   unsigned int is_precise = 0;
 
   // Create an array to hold the allocated rows of the input array.
@@ -444,7 +632,7 @@ void compute_parallel(
   double core_top_row[size];
   double core_bot_row[size];
 
-
+  // Runs the algorithm until the required precision is met.
   while (is_precise == 0) {
     // Make the assumption that all values in the sub_arr have already
     // met the required precision.
@@ -486,9 +674,9 @@ void compute_parallel(
       }
     }
 
+    // Calculate the averages of the sub array and store them in a new array.
     double avg_arr[size * num_of_rows];
     memcpy(&avg_arr, &sub_arr[size], sizeof(double) * size * num_of_rows);
-    // Calculate the averages of the sub array and store them in a new array.
     calculate_averages(
       sub_arr,
       avg_arr,
@@ -563,7 +751,8 @@ void compute_parallel(
       }
     }
   }
-
+  // The root core broadcasts the output array to all cores to ensure all cores
+  // have the same output array.
   MPI_Bcast(ptr_out_arr, (int)(size * size), MPI_DOUBLE, 0, MPI_COMM_WORLD);
 }
 
@@ -575,14 +764,19 @@ void calculate_averages(
   unsigned int const num_of_rows,
   unsigned int const size
 ) {
-  
+  // Gets the core id and the number of cores so that the first and last
+  // rows can be ignored by the first and last cores respectively.
   int core_id;
   int num_cores;
   MPI_Comm_rank(MPI_COMM_WORLD, &core_id);
   MPI_Comm_size(MPI_COMM_WORLD, &num_cores);
 
+  // Calculates the average of the four surrounding values for each element
+  // and stores the result in the output array.
   for (unsigned int idx = size; idx < (size * num_of_rows + size); idx++) {
 
+    // Calculates the x and y coordinates of the current element So that
+    // the first and last column and row can be ignored.
     unsigned int x = idx % size;
     unsigned int y = (unsigned int)floor(idx / size);
 
@@ -624,23 +818,38 @@ void compute_sequentially(
   unsigned int const size,
   double const precision
 ) {
+  // Loops until the required level of precision is met.
   int is_precise = 0;
   while (is_precise == 0) {
+    // Sets is_precise to 1 so that it can be set to 0 if a difference
+    // does not meet the required level of precision.
     is_precise = 1;
+
+    // Loops through the array and calculates the average of the four
+    // surrounding values for each element.
     for (unsigned int j = 0; j < size; j++) {
       for (unsigned int i = 0; i < size; i++) {
+
+        // Calculates the index of the current element
         unsigned int index = (j * size) + i;
+
+        // Ignores the first and last column and row
         if ((i == 0) || (i == (size - 1)) || (j == 0) || (j == (size - 1))) { continue; }
+
+        // Calculates the average of the four surrounding values
         double accumulator = 0;
         double val_1 = ptr_in_arr[index - 1];
         double val_2 = ptr_in_arr[index + 1];
         double val_3 = ptr_in_arr[index - size];
         double val_4 = ptr_in_arr[index + size];
-        
         accumulator += (val_1 + val_2 + val_3 + val_4);
         double average = accumulator / 4.;
+
+        // Stores the average in the output array
         ptr_out_arr[index] = average;
 
+        // Computes the difference between the current value and the average
+        // and checks if the difference meets the required level of precision.
         double current_val = ptr_in_arr[index];
         double difference = fabs(current_val - average);
         if (difference >= precision) {
@@ -648,6 +857,8 @@ void compute_sequentially(
         }
       }
     }
+    // Copies the output array to the input array so that the next iteration
+    // can use the output array as the input array.
     memcpy(ptr_in_arr, ptr_out_arr, size * size * sizeof(double));
   }
 }
@@ -657,6 +868,7 @@ void populate_array_type_1(
   double *input_arr,
   unsigned int const size
 ) {
+  // Sets the first row and column to 1 and the rest to 0.
   for (unsigned int j = 0; j < size; j++) {
     for (unsigned int i = 0; i < size; i++) {
       unsigned int index = (j * size) + i;
@@ -673,6 +885,7 @@ void populate_array_type_2(
   double *input_arr,
   unsigned int const size
 ) {
+  // Sets each elements value to its y coordinate.
   for (unsigned int j = 0; j < size; j++) {
     for (unsigned int i = 0; i < size; i++) {
       unsigned int index = (j * size) + i;
@@ -685,6 +898,7 @@ void populate_array_type_3(
   double *input_arr,
   unsigned int const size
 ) {
+  // Sets the top row to 1 and the rest to 0.
   for (unsigned int i = 0; i < size; i++) {
     input_arr[i] = 1.;
   }
@@ -695,63 +909,59 @@ void populate_array(
   unsigned int const size,
   unsigned int const type
 ) {
+  // Populates the array based on the given type.
   if (type == 1) {
+    // Type 1 sets the first row and column to 1 and the rest to 0.
     populate_array_type_1(input_arr, size);
   } else if (type == 2) {
+    // Type 2 sets each elements value to its y coordinate.
     populate_array_type_2(input_arr, size);
   } else if (type == 3) {
+    // Type 3 sets the top row to 1 and the rest to 0.
     populate_array_type_3(input_arr, size);
   }
 };
 
-/**
- * @brief Compares two given arrays to see if their values match.
- * 
- * @param out_arr   (*double)       pointer to array to compare.
- * @param exp_arr   (*double)       pointer to array to compare.
- * @param size      (unsigned int)  size of the arrays (one-dimension).
- * 
- * @return          (int)           1 if arrays match, 0 if they do not.
- */
+
 int do_arrays_match(
   double *arr_1,
   double *arr_2,
   unsigned int const size,
   unsigned int const can_print
 ) {
+  // Gets the core id so that only the root core prints instead of all cores
+  // printing.
   int core_id;
   MPI_Comm_rank(MPI_COMM_WORLD, &core_id);
   if (can_print && (core_id == 0)) {
     printf("Checking if arrays match...\n");
   }
+
+  // Assumes that the arrays match at the start. If they do not match, then
+  // is_same is set to 0. Else, it is set to its previous value incase a
+  // previous difference did not meet the required level of precision.
   int is_same = 1;
+
+  // Loops through the arrays and checks if the values match.
   for (unsigned int j = 0; j < size; j++) {
     for (unsigned int i = 0; i < size; i++) {
+      // Calculates the index of the current element
       unsigned int index = (j * size) + i;
 
-      // There is an error here that causes the two values not to match.
-      // When printing the values, they are the same. However, when
-      // subtracting them, the result is not 0. Again, printing the difference
-      // shows that it is 0. The cause of the error is unknown. As the error is
-      // smaller than the number of significant figures being printed, it is
-      // not and major issue.
-
-      // To solve this, the difference is rounded to 6 decimal places. This
-      // ensures that the difference is 0.000000, which is the same as the
-      // difference being 0. This is not a good solution, but it is the best
-      // that can be done at this time.
-
+      // Checks if the values match.
       double difference = arr_1[index] - arr_2[index];
-      // rounds to 6 decimal places
-      double rounded_diff = round(difference * 1000000) / 1000000;
+      
       if (arr_1[index] != arr_2[index]) {
+        // Sets is_same to 0 if the values do not match.
         is_same = 0;
+        // Prints the values if the arrays do not match for debugging.
         if (can_print && (core_id == 0)) {
-          printf("NO MATCH y: %d x: %d. Expected %f, got %f. Difference %f.\n", j, i, arr_2[index], arr_1[index], difference);
+          printf("NO MATCH y: %d x: %d. Expected %f, got %f.\n", j, i, arr_2[index], arr_1[index]);
         }
       }
     }
   }
+  // Prints if the arrays match.
   return is_same;
 }
 
@@ -760,6 +970,7 @@ void print_array(
   unsigned int const cols,
   unsigned int const rows
 ) {
+  // Prints the array row by row.
   for (unsigned int j = 0; j < rows; j++) {
     printf("[");
     for (unsigned int i = 0; i < cols; i++) {
@@ -776,5 +987,6 @@ void print_array_uniform(
   double *arr,
   unsigned int const size
 ) {
+  // Prints the array in a uniform format.
   print_array(arr, size, size);
 };
