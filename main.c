@@ -500,6 +500,17 @@ int run_test(
   double const precision
 ) {
 
+  // Get the core rank and the number of cores so we can get an more accurate
+  // time for the parallel and sequential algorithms.
+  int core_id;
+  int num_cores;
+  MPI_Comm_rank(MPI_COMM_WORLD, &core_id);
+  MPI_Comm_size(MPI_COMM_WORLD, &num_cores);
+
+  if (num_cores > size) {
+    return 0;
+  }
+
   // Allocate memory for the array then populate it based on the array type
   double *ptr_arr = malloc((size * size) * sizeof(double));
   populate_array(ptr_arr, size, arr_type);
@@ -518,13 +529,6 @@ int run_test(
 
   // Free the original array
   free(ptr_arr);
-
-  // Get the core rank and the number of cores so we can get an more accurate
-  // time for the parallel and sequential algorithms.
-  int core_id;
-  int num_cores;
-  MPI_Comm_rank(MPI_COMM_WORLD, &core_id);
-  MPI_Comm_size(MPI_COMM_WORLD, &num_cores);
 
   // Run the parallel algorithm first as there will be less variance in the
   // start time for each core as less code is executed before the parallel
@@ -602,6 +606,7 @@ void compute_parallel(
   MPI_Comm_rank(MPI_COMM_WORLD, &core_id);
   MPI_Comm_size(MPI_COMM_WORLD, &num_cores);
 
+  
   MPI_Status status;
 
   // Calculate the minimum number of rows that each core will be responsible
@@ -610,8 +615,8 @@ void compute_parallel(
   // Calculate the number of rows that will be left over.
   unsigned int remainder_rows = size % (unsigned int)num_cores;
   // Calculate the start and end row for this core.
-  unsigned int start_row = (unsigned int)core_id < remainder_rows ? (unsigned int)core_id * rows_per_core * 2 : (unsigned int)core_id * rows_per_core + remainder_rows;
-  unsigned int end_row = (unsigned int)core_id < remainder_rows ? start_row + rows_per_core * 2 - 1 : start_row + rows_per_core - 1;
+  unsigned int start_row = (unsigned int)core_id < remainder_rows ? (unsigned int)core_id * (rows_per_core + 1) : (unsigned int)core_id * rows_per_core + remainder_rows;
+  unsigned int end_row = (unsigned int)core_id < remainder_rows ? start_row + rows_per_core : start_row + rows_per_core - 1;
   // Calculate the number of rows this core will be responsible for.
   unsigned int num_of_rows = end_row + 1 - start_row;
   // Calculate the core id of the core above and below this core.
@@ -620,6 +625,7 @@ void compute_parallel(
   // Calculate the number of rows that the core above and below this core
   unsigned int is_precise = 0;
 
+  
   // Create an array to hold the allocated rows of the input array.
   // This is padded by one row at the top and another at the bottom
   // to allow for the core to access the rows above and below it that
@@ -631,6 +637,7 @@ void compute_parallel(
   // that are too be sent to the adjacent cores.
   double core_top_row[size];
   double core_bot_row[size];
+
 
   // Runs the algorithm until the required precision is met.
   while (is_precise == 0) {
@@ -644,33 +651,38 @@ void compute_parallel(
     memcpy(core_bot_row, &sub_arr[size * num_of_rows], sizeof(double) * size);
 
     // If there is only one core, then there is no need to pass messages.
-    // All the even ID cores will send their top and bottom rows to their
-    // neighboring cores whilst the odd ID cores will wait to receive these
-    // rows. Once a core has sent/received a row, they will then with to
-    // receive/send a row. This way, every send has a receive and vice versa
-    // therefore preventing deadlocks.
+    // A loop is used to determine which core is sending data, which core
+    // is receiving data, and which core is skipping to the next iteration.
+
+    // The second and last core will receive a row from the first core whilst
+    // the other cores will wait to receive. Once the second and last core have
+    // received the row and the first sent it, they will become unblocked and
+    // continue to the next iteration where they will send and receive the
+    // row from the core above them.
+
+    // Essentially, each core takes it in turn to send data whilst the other
+    // cores wait to receive. Once all cores have received the data, they can
+    // calculate the averages.
 
     // The First core will receive a row from the bottom core and vice versa
     // however, the cores will not use this row as the edge rows and columns
     // averages are no calculated. This is just a redundant send and receive.
     if (num_cores > 1) {
-      // If the core is an odd ID, then it will wait to receive a row from
-      // its neighboring cores.
-      if (core_id % 2 == 1) {
-        MPI_Recv(&sub_arr[size * (num_of_rows + 1)], (int)size, MPI_DOUBLE, next_core_id, 1, MPI_COMM_WORLD, &status);
-        MPI_Recv(&sub_arr[0], (int)size, MPI_DOUBLE, prev_core_id, 1, MPI_COMM_WORLD, &status);
-      } else {
-        MPI_Send(core_top_row, (int)size, MPI_DOUBLE, prev_core_id, 1, MPI_COMM_WORLD);
-        MPI_Send(core_bot_row, (int)size, MPI_DOUBLE, next_core_id, 1, MPI_COMM_WORLD);
-      }
-      // If the core is an even ID, then it will send a row to its neighboring
-      // cores.
-      if (core_id % 2 == 1) {
-        MPI_Send(core_top_row, (int)size, MPI_DOUBLE, prev_core_id, 0, MPI_COMM_WORLD);
-        MPI_Send(core_bot_row, (int)size, MPI_DOUBLE, next_core_id, 0, MPI_COMM_WORLD);
-      } else {
-        MPI_Recv(&sub_arr[size * (num_of_rows + 1)], (int)size, MPI_DOUBLE, next_core_id, 0, MPI_COMM_WORLD, &status);
-        MPI_Recv(&sub_arr[0], (int)size, MPI_DOUBLE, prev_core_id, 0, MPI_COMM_WORLD, &status);
+      for (int core_num = 0; core_num < num_cores; core_num++) {
+
+        int next_core_num = (core_num + 1) % num_cores;
+        int prev_core_num = core_num != 0 ? core_num - 1 : num_cores - 1;
+
+        if (core_id == prev_core_num) {
+          MPI_Recv(&sub_arr[size * (num_of_rows + 1)], (int)size, MPI_DOUBLE, next_core_id, core_num, MPI_COMM_WORLD, &status);
+        } else if (core_id == core_num) {
+          MPI_Send(core_top_row, (int)size, MPI_DOUBLE, prev_core_id, core_num, MPI_COMM_WORLD);
+          MPI_Send(core_bot_row, (int)size, MPI_DOUBLE, next_core_id, core_num, MPI_COMM_WORLD);
+        } else if (core_id == next_core_num) {
+          MPI_Recv(&sub_arr[0], (int)size, MPI_DOUBLE, prev_core_id, core_num, MPI_COMM_WORLD, &status);
+        } else {
+          continue;
+        }
       }
     }
 
@@ -685,7 +697,8 @@ void compute_parallel(
       num_of_rows,
       size
     );
-
+    
+    
     // Copy the averages to the sub array.
     memcpy(&sub_arr[size], avg_arr, sizeof(double) * size * num_of_rows);
 
@@ -949,8 +962,6 @@ int do_arrays_match(
       unsigned int index = (j * size) + i;
 
       // Checks if the values match.
-      double difference = arr_1[index] - arr_2[index];
-      
       if (arr_1[index] != arr_2[index]) {
         // Sets is_same to 0 if the values do not match.
         is_same = 0;
