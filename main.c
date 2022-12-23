@@ -804,6 +804,11 @@ void compute_parallel(
   // The root core gathers all the sub arrays from each core.
   MPI_Gatherv(&sub_arr[size], count, MPI_DOUBLE, ptr_out_arr, recvcounts, displs, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
+  if (core_id == 0) {
+    free(displs);
+    free(recvcounts);
+  }
+
   if (can_print) { printf("Core %d: Gathering Complete\n", core_id); }
   // The root core broadcasts the output array to all cores to ensure all cores
   // have the same output array.
