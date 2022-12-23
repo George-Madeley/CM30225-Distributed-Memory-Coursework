@@ -771,57 +771,38 @@ void compute_parallel(
 
   if (can_print) { printf("Core %d: Gathering Sub Arrays\n", core_id); }
 
-
-
   int count = (int)(size * num_of_rows);
 
-  
+  // Displacements and counts are used to gather the sub arrays.
 
-  if (remainder_rows == 0) {
-    // If there are no remainder rows, then all cores have the same number of rows.
-    // Therefore, the root core can gather all the sub arrays in one go.
-    if (core_id == 0) {
-      if (can_print) { printf("Core %d: Same Size, Gathering Receive.\n", core_id); }
-      MPI_Gather(&sub_arr[size], count, MPI_DOUBLE, ptr_out_arr, count, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-    } else {
-      if (can_print) { printf("Core %d: Same Size, Gathering Send.\n", core_id); }
-      MPI_Gather(&sub_arr[size], count, MPI_DOUBLE, NULL, count, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-    }
-  } else {
-    // If there are remainder rows, then the root core must gather the larger arrays whilst,
-    // another core gathers the smaller arrays. Once completed, a send/receive is sent to the
-    // root core containing the gathered smaller arrays.
-    if (core_id < (int)remainder_rows) {
-      // Larger Arrays are gathered by the root core.
-      if (core_id == 0) {
-        if (can_print) { printf("Core %d: Large Size, Gathering Receive.\n", core_id); }
-        MPI_Gather(&sub_arr[size], count, MPI_DOUBLE, ptr_out_arr, count, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        int send_count = (int)((int)size * ((int)num_of_rows - 1) * (num_cores - (int)remainder_rows));
+  // Displacements are used to determine the starting position of each sub array.
+  int *displs = NULL;
+  // Counts are used to determine the size of each sub array.
+  int *recvcounts = NULL;
 
-        // Receives the smaller arrays from the other core. It immediately stores them in the output array.
-        // This completes the gathering of all the arrays.
-        if (can_print) { printf("Core %d: ROOT Waiting for Receive.\n", core_id); }
-        MPI_Recv(&(ptr_out_arr[count * (int)remainder_rows]), send_count, MPI_DOUBLE, (int)remainder_rows, 0, MPI_COMM_WORLD, &status);
-      } else {
-        if (can_print) { printf("Core %d: Large Size, Gathering Send.\n", core_id); }
-        MPI_Gather(&sub_arr[size], count, MPI_DOUBLE, NULL, count, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-      }
-    } else {
-      // Smaller Arrays are gathered by the other core.
-      if (core_id == (int)remainder_rows) {
-        // Temporarily store the smaller arrays in a temporary array.
-        if (can_print) { printf("Core %d: Small Size, Gathering Receive.\n", core_id); }
-        double ptr_temp_out_arr[count * (num_cores - (int)remainder_rows)];
-        MPI_Gather(&sub_arr[size], count, MPI_DOUBLE, ptr_temp_out_arr, count, MPI_DOUBLE, (int)remainder_rows, MPI_COMM_WORLD);
-        // Sends the smaller arrays to the root core.
-        if (can_print) { printf("Core %d: SmaLL Size, Waiting for Send.\n", core_id); }
-        MPI_Send(&ptr_temp_out_arr, (int)(count * (num_cores - (int)remainder_rows)), MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
-      } else {
-        if (can_print) { printf("Core %d: Small Size, Gathering Send.\n", core_id); }
-        MPI_Gather(&sub_arr[size], count, MPI_DOUBLE, NULL, count, MPI_DOUBLE, (int)remainder_rows, MPI_COMM_WORLD);
-      }
+  // Th root core gathers all the sub array sizes from each core.
+  if (core_id == 0) {
+    recvcounts = (int *)malloc(sizeof(int) * (unsigned int)num_cores);
+  }
+  MPI_Gather(&count, 1, MPI_INT, recvcounts, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+  // The root core calculates the displacements of each sub array.
+  if (core_id == 0) {
+    displs = (int *)malloc(sizeof(int) * (unsigned int)num_cores);
+
+    // The first sub array starts at the beginning of the output array.
+    displs[0] = 0;
+
+    // The displacements of the remaining sub arrays are calculated by adding
+    // the size of the previous sub array to the displacement of the previous
+    // sub array.
+    for (int i = 1; i < num_cores; i++) {
+      displs[i] = displs[i - 1] + recvcounts[i - 1];
     }
   }
+
+  // The root core gathers all the sub arrays from each core.
+  MPI_Gatherv(&sub_arr[size], count, MPI_DOUBLE, ptr_out_arr, recvcounts, displs, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
   if (can_print) { printf("Core %d: Gathering Complete\n", core_id); }
   // The root core broadcasts the output array to all cores to ensure all cores
