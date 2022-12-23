@@ -37,6 +37,7 @@ void run_static_test(
   unsigned int const arr_type,
   unsigned int const num_of_tests,
   unsigned int const can_print,
+  unsigned int const do_sequential,
   double const precision
 );
 
@@ -56,6 +57,7 @@ void run_precision_tests(
   unsigned int const arr_type,
   unsigned int const num_of_tests,
   unsigned int const can_print,
+  unsigned int const do_sequential,
   double const precision
 );
 
@@ -74,6 +76,7 @@ void run_arr_size_tests(
   unsigned int const arr_type,
   unsigned int const num_of_tests,
   unsigned int const can_print,
+  unsigned int const do_sequential,
   double const precision
 );
 
@@ -99,6 +102,7 @@ int run_tests(
   unsigned int const arr_type,
   unsigned int const num_of_tests,
   unsigned int const can_print,
+  unsigned int const do_sequential,
   double *average_parallel_time,
   double *average_sequential_time,
   double const precision
@@ -122,6 +126,7 @@ int run_test(
   unsigned int const size,
   unsigned int const arr_type,
   unsigned int const can_print,
+  unsigned int const do_sequential,
   double *parallel_time,
   double *sequential_time,
   double const precision
@@ -142,6 +147,7 @@ void compute_parallel(
   double *ptr_in_arr,
   double *ptr_out_arr,
   double const precision,
+  unsigned int can_print,
   unsigned int const size
 );
 
@@ -245,7 +251,7 @@ void print_array(
 int main(int argc, char **argv)
 {
   // Check for valid command line arguments.
-  if (argc < 6) {
+  if (argc < 8) {
     printf("Invalid Command Line Arguments");
     exit(-1);
   }
@@ -257,6 +263,7 @@ int main(int argc, char **argv)
   unsigned int const num_of_tests = (unsigned int)atoi(argv[4]);
   unsigned int const arr_type = (unsigned int)atoi(argv[5]);
   unsigned int const can_print = (unsigned int)atoi(argv[6]);
+  unsigned int const do_sequential = (unsigned int)atoi(argv[7]);
 
   // Initialize MPI and check for errors.
   int rc = MPI_Init(&argc, &argv);
@@ -268,17 +275,17 @@ int main(int argc, char **argv)
   // Run the appropriate test based on the test type.
   if (test_type == 0) {
     // This will run a single test a given number of times.
-    run_static_test(size, arr_type, num_of_tests, can_print, precision);
+    run_static_test(size, arr_type, num_of_tests, can_print, do_sequential, precision);
   } else if (test_type == 1) {
     // This will run a single test with a range of precisions starting at 0.1
     // and ending at the given precision. The size will vary logarithmically.
     // A given number of tests will be run for each precision.
-    run_precision_tests(size, arr_type, num_of_tests, can_print, precision);
+    run_precision_tests(size, arr_type, num_of_tests, can_print, do_sequential, precision);
   } else if (test_type == 2) {
     // This will run a single test with a range of sizes starting at 10 and
     // ending at the given size. The size will vary logarithmically. A given
     // number of tests will be run for each size.
-    run_arr_size_tests(size, arr_type, num_of_tests, can_print, precision);
+    run_arr_size_tests(size, arr_type, num_of_tests, can_print, do_sequential, precision);
   }
   
   // Finalize MPI.
@@ -293,6 +300,7 @@ void run_static_test(
   unsigned int const arr_type,
   unsigned int const num_of_tests,
   unsigned int const can_print,
+  unsigned int const do_sequential,
   double const precision
 ) {
 
@@ -315,6 +323,7 @@ void run_static_test(
     arr_type,
     num_of_tests,
     can_print,
+    do_sequential,
     &average_parallel_time,
     &average_sequential_time,
     precision
@@ -340,6 +349,7 @@ void run_precision_tests(
   unsigned int const arr_type,
   unsigned int const num_of_tests,
   unsigned int const can_print,
+  unsigned int const do_sequential,
   double const precision
 ) {
   // Get the core id so that only core 0 prints the results instead of multiple
@@ -368,6 +378,7 @@ void run_precision_tests(
         arr_type,
         num_of_tests,
         can_print,
+        do_sequential,
         &average_parallel_time,
         &average_sequential_time,
         var_precision
@@ -395,6 +406,7 @@ void run_arr_size_tests(
   unsigned int const arr_type,
   unsigned int const num_of_tests,
   unsigned int const can_print,
+  unsigned int const do_sequential,
   double const precision
 ) {
   // Get the core id so that only core 0 prints the results instead of multiple
@@ -427,6 +439,7 @@ void run_arr_size_tests(
         arr_type,
         num_of_tests,
         can_print,
+        do_sequential,
         &average_parallel_time,
         &average_sequential_time,
         precision
@@ -454,6 +467,7 @@ int run_tests(
   unsigned int const arr_type,
   unsigned int const num_of_tests,
   unsigned int const can_print,
+  unsigned int const do_sequential,
   double *average_parallel_time,
   double *average_sequential_time,
   double const precision
@@ -473,6 +487,7 @@ int run_tests(
       size,
       arr_type,
       can_print,
+      do_sequential,
       &parallel_time,
       &sequential_time,
       precision
@@ -495,6 +510,7 @@ int run_test(
   unsigned int const size,
   unsigned int const arr_type,
   unsigned int const can_print,
+  unsigned int const do_sequential,
   double *parallel_time,
   double *sequential_time,
   double const precision
@@ -507,7 +523,7 @@ int run_test(
   MPI_Comm_rank(MPI_COMM_WORLD, &core_id);
   MPI_Comm_size(MPI_COMM_WORLD, &num_cores);
 
-  if (num_cores > size) {
+  if (num_cores > (int)size) {
     return 0;
   }
 
@@ -515,26 +531,18 @@ int run_test(
   double *ptr_arr = malloc((size * size) * sizeof(double));
   populate_array(ptr_arr, size, arr_type);
   
-  // Allocate memory for the sequential and parallel arrays
-  double *ptr_s_input_arr  = malloc((size * size) * sizeof(double));
-  double *ptr_s_output_arr = malloc((size * size) * sizeof(double));
+  // Allocate memory for the input and output arrays for the parallel algorithm.
+  // The arrays are copied from the original array to reduce runtime.
   double *ptr_p_input_arr  = malloc((size * size) * sizeof(double));
   double *ptr_p_output_arr = malloc((size * size) * sizeof(double));
-
-  // Copy the array into the sequential and parallel arrays
-  memcpy(ptr_s_input_arr , ptr_arr, (size * size) * sizeof(double));
-  memcpy(ptr_s_output_arr, ptr_arr, (size * size) * sizeof(double));
   memcpy(ptr_p_input_arr , ptr_arr, (size * size) * sizeof(double));
   memcpy(ptr_p_output_arr, ptr_arr, (size * size) * sizeof(double));
-
-  // Free the original array
-  free(ptr_arr);
 
   // Run the parallel algorithm first as there will be less variance in the
   // start time for each core as less code is executed before the parallel
   // algorithm is run.
   double parallel_time_start = (double)clock();
-  compute_parallel(ptr_p_input_arr, ptr_p_output_arr, precision, size);
+  compute_parallel(ptr_p_input_arr, ptr_p_output_arr, precision, can_print, size);
   double parallel_time_end = (double)clock();
   
   // To get the true parallel time we need to find the start time of the
@@ -552,40 +560,66 @@ int run_test(
   }
   MPI_Bcast(parallel_time, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
-  // Run the sequential algorithm
-  clock_t sequential_time_start = clock();
-  compute_sequentially(ptr_s_input_arr, ptr_s_output_arr, size, precision);
-  clock_t sequential_time_end = clock();
+  // As the sequential algorithm is optional to reduce batch testing run time,
+  // we assume that the tests have passed. This will be overwritten if the
+  // sequential is run and the comparision of the sequential and parallel
+  // arrays do not match.
+  int has_passed = 1;
 
-  // To get a more precise sequential time we need to find the average
-  // sequential time of all the cores.
-  double core_sequential_time = (double)(sequential_time_end - sequential_time_start) / CLOCKS_PER_SEC;
-  double summed_sequential_time;
-  MPI_Reduce(&core_sequential_time, &summed_sequential_time, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
-  // Only the first core will have the correct sequential time. So, it
-  // will need to broadcast it to the other cores.
-  if (core_id == 0) {
-    *sequential_time = summed_sequential_time / num_cores;
+  // If the sequential algorithm is to be run, then run it.
+  if (do_sequential) {
+
+    // Allocate memory for the input and output arrays for the sequential
+    // algorithm. The arrays are copied from the original array to reduce
+    // runtime.
+    double *ptr_s_input_arr  = malloc((size * size) * sizeof(double));
+    double *ptr_s_output_arr = malloc((size * size) * sizeof(double));
+    memcpy(ptr_s_input_arr , ptr_arr, (size * size) * sizeof(double));
+    memcpy(ptr_s_output_arr, ptr_arr, (size * size) * sizeof(double));
+
+    // Run the sequential algorithm
+    clock_t sequential_time_start = clock();
+    compute_sequentially(ptr_s_input_arr, ptr_s_output_arr, size, precision);
+    clock_t sequential_time_end = clock();
+
+    // To get a more precise sequential time we need to find the average
+    // sequential time of all the cores.
+    double core_sequential_time = (double)(sequential_time_end - sequential_time_start) / CLOCKS_PER_SEC;
+    double summed_sequential_time;
+    MPI_Reduce(&core_sequential_time, &summed_sequential_time, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+
+    // Only the first core will have the correct sequential time. So, it
+    // will need to broadcast it to the other cores.
+    if (core_id == 0) {
+      *sequential_time = summed_sequential_time / num_cores;
+    }
+    MPI_Bcast(sequential_time, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+    // Check if the sequential and parallel algorithms have produced the same
+    // output.
+    has_passed = do_arrays_match(ptr_p_output_arr, ptr_s_output_arr, size, can_print);
+
+    // Prints the sequential arrays.
+    if (core_id == 0 && can_print) {
+      printf("Sequential Output:\n");
+      print_array(ptr_s_output_arr, size, size);
+    }
+
+    // free the memory
+    free(ptr_s_output_arr);
+    free(ptr_s_input_arr);
   }
-  MPI_Bcast(sequential_time, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
-  // Check if the sequential and parallel algorithms have produced the same
-  // output.
-  int has_passed = do_arrays_match(ptr_p_output_arr, ptr_s_output_arr, size, can_print);
-
-  // Prints the sequential and parallel arrays.
+  // Prints the  parallel arrays.
   if (core_id == 0 && can_print) {
-    printf("Sequential Output:\n");
-    print_array(ptr_s_output_arr, size, size);
     printf("Parallel Output:\n");
     print_array(ptr_p_output_arr, size, size);
   }
 
   // Free the memory
-  free(ptr_s_output_arr);
-  free(ptr_s_input_arr);
   free(ptr_p_input_arr);
   free(ptr_p_output_arr);
+  free(ptr_arr);
 
   // Return whether the sequential and parallel algorithms have produced the
   // same output.
@@ -597,8 +631,10 @@ void compute_parallel(
   double *ptr_in_arr,
   double *ptr_out_arr,
   double precision,
+  unsigned int can_print,
   unsigned int size
 ) {
+
   // Get the core rank and the number of cores so we can split the array
   // between the cores.
   int core_id;
@@ -606,6 +642,7 @@ void compute_parallel(
   MPI_Comm_rank(MPI_COMM_WORLD, &core_id);
   MPI_Comm_size(MPI_COMM_WORLD, &num_cores);
 
+  if (can_print) { printf("Core %d: Beginning Parallel Algorithm\n", core_id); }
   
   MPI_Status status;
 
@@ -625,7 +662,7 @@ void compute_parallel(
   // Calculate the number of rows that the core above and below this core
   unsigned int is_precise = 0;
 
-  
+  if (can_print) { printf("Core %d: Start Row: %d, End Row: %d, Num of Rows: %d, next core: %d, prev core: %d\n", core_id, start_row, end_row, num_of_rows, next_core_id, prev_core_id); }
   // Create an array to hold the allocated rows of the input array.
   // This is padded by one row at the top and another at the bottom
   // to allow for the core to access the rows above and below it that
@@ -638,7 +675,7 @@ void compute_parallel(
   double core_top_row[size];
   double core_bot_row[size];
 
-
+  if (can_print) { printf("Core %d: Beginning Iterations\n", core_id); }
   // Runs the algorithm until the required precision is met.
   while (is_precise == 0) {
     // Make the assumption that all values in the sub_arr have already
@@ -667,6 +704,8 @@ void compute_parallel(
     // The First core will receive a row from the bottom core and vice versa
     // however, the cores will not use this row as the edge rows and columns
     // averages are no calculated. This is just a redundant send and receive.
+    if (can_print) { printf("Core %d: Passing Rows\n", core_id); }
+
     if (num_cores > 1) {
       for (int core_num = 0; core_num < num_cores; core_num++) {
 
@@ -685,6 +724,8 @@ void compute_parallel(
         }
       }
     }
+
+    if (can_print) { printf("Core %d: Calculating Averages\n", core_id); }
 
     // Calculate the averages of the sub array and store them in a new array.
     double avg_arr[size * num_of_rows];
@@ -708,6 +749,8 @@ void compute_parallel(
     // core must gather the is_precise values from each core, use a MIN
     // to check if all cores have reached the required level of precision
     // and then broadcast the result to all cores.
+    if (can_print) { printf("Core %d: Checking Precision\n", core_id); }
+
     unsigned int global_is_precise = 0;
     MPI_Reduce(&is_precise, &global_is_precise, 1, MPI_UNSIGNED, MPI_MIN, 0, MPI_COMM_WORLD);
     is_precise = global_is_precise == 1 ? 1 : 0;
@@ -726,13 +769,22 @@ void compute_parallel(
   // Whilst doing so, another core gathers the smaller arrays. Once completed,
   // a send/receive is sent to the root core containing the gathered smaller arrays.
 
+  if (can_print) { printf("Core %d: Gathering Sub Arrays\n", core_id); }
+
+
+
   int count = (int)(size * num_of_rows);
+
+  
+
   if (remainder_rows == 0) {
     // If there are no remainder rows, then all cores have the same number of rows.
     // Therefore, the root core can gather all the sub arrays in one go.
     if (core_id == 0) {
+      if (can_print) { printf("Core %d: Same Size, Gathering Receive.\n", core_id); }
       MPI_Gather(&sub_arr[size], count, MPI_DOUBLE, ptr_out_arr, count, MPI_DOUBLE, 0, MPI_COMM_WORLD);
     } else {
+      if (can_print) { printf("Core %d: Same Size, Gathering Send.\n", core_id); }
       MPI_Gather(&sub_arr[size], count, MPI_DOUBLE, NULL, count, MPI_DOUBLE, 0, MPI_COMM_WORLD);
     }
   } else {
@@ -742,31 +794,41 @@ void compute_parallel(
     if (core_id < (int)remainder_rows) {
       // Larger Arrays are gathered by the root core.
       if (core_id == 0) {
+        if (can_print) { printf("Core %d: Large Size, Gathering Receive.\n", core_id); }
         MPI_Gather(&sub_arr[size], count, MPI_DOUBLE, ptr_out_arr, count, MPI_DOUBLE, 0, MPI_COMM_WORLD);
         int send_count = (int)((int)size * ((int)num_of_rows - 1) * (num_cores - (int)remainder_rows));
 
         // Receives the smaller arrays from the other core. It immediately stores them in the output array.
         // This completes the gathering of all the arrays.
+        if (can_print) { printf("Core %d: ROOT Waiting for Receive.\n", core_id); }
         MPI_Recv(&(ptr_out_arr[count * (int)remainder_rows]), send_count, MPI_DOUBLE, (int)remainder_rows, 0, MPI_COMM_WORLD, &status);
       } else {
+        if (can_print) { printf("Core %d: Large Size, Gathering Send.\n", core_id); }
         MPI_Gather(&sub_arr[size], count, MPI_DOUBLE, NULL, count, MPI_DOUBLE, 0, MPI_COMM_WORLD);
       }
     } else {
       // Smaller Arrays are gathered by the other core.
       if (core_id == (int)remainder_rows) {
         // Temporarily store the smaller arrays in a temporary array.
+        if (can_print) { printf("Core %d: Small Size, Gathering Receive.\n", core_id); }
         double ptr_temp_out_arr[count * (num_cores - (int)remainder_rows)];
-        MPI_Gather(&sub_arr[size], count, MPI_DOUBLE, ptr_out_arr, count, MPI_DOUBLE, (int)remainder_rows, MPI_COMM_WORLD);
+        MPI_Gather(&sub_arr[size], count, MPI_DOUBLE, ptr_temp_out_arr, count, MPI_DOUBLE, (int)remainder_rows, MPI_COMM_WORLD);
         // Sends the smaller arrays to the root core.
+        if (can_print) { printf("Core %d: SmaLL Size, Waiting for Send.\n", core_id); }
         MPI_Send(&ptr_temp_out_arr, (int)(count * (num_cores - (int)remainder_rows)), MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
       } else {
+        if (can_print) { printf("Core %d: Small Size, Gathering Send.\n", core_id); }
         MPI_Gather(&sub_arr[size], count, MPI_DOUBLE, NULL, count, MPI_DOUBLE, (int)remainder_rows, MPI_COMM_WORLD);
       }
     }
   }
+
+  if (can_print) { printf("Core %d: Gathering Complete\n", core_id); }
   // The root core broadcasts the output array to all cores to ensure all cores
   // have the same output array.
   MPI_Bcast(ptr_out_arr, (int)(size * size), MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+  if (can_print) { printf("Core %d: Finished\n", core_id); }
 }
 
 void calculate_averages(
