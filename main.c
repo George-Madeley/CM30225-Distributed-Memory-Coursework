@@ -270,6 +270,7 @@ int main(int argc, char **argv)
   if (rc != MPI_SUCCESS) {
     printf("Error starting MPI program. Terminating.\n");
     MPI_Abort(MPI_COMM_WORLD, rc);
+    exit(-1);
   }
 
   // Run the appropriate test based on the test type.
@@ -713,11 +714,15 @@ void compute_parallel(
         int prev_core_num = core_num != 0 ? core_num - 1 : num_cores - 1;
 
         if (core_id == prev_core_num) {
+          // Wait to receive a row from the next core.
           MPI_Recv(&sub_arr[size * (num_of_rows + 1)], (int)size, MPI_DOUBLE, next_core_id, core_num, MPI_COMM_WORLD, &status);
         } else if (core_id == core_num) {
+          // Send the top row to the previous core.
           MPI_Send(core_top_row, (int)size, MPI_DOUBLE, prev_core_id, core_num, MPI_COMM_WORLD);
+          // Send the bottom row to the next core.
           MPI_Send(core_bot_row, (int)size, MPI_DOUBLE, next_core_id, core_num, MPI_COMM_WORLD);
         } else if (core_id == next_core_num) {
+          // Wait to receive a row from the previous core.
           MPI_Recv(&sub_arr[0], (int)size, MPI_DOUBLE, prev_core_id, core_num, MPI_COMM_WORLD, &status);
         } else {
           continue;
