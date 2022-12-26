@@ -370,6 +370,9 @@ void run_precision_tests(
       // Calculate the precision for this test.
       double var_precision = i / pow(10., exponent);
 
+      // If the precision is less than the given precision, then break.
+      if (var_precision < precision) { break; }
+
       // Run the tests and get the average sequential and parallel times.
       double average_sequential_time = 0.;
       double average_parallel_time = 0.;
@@ -530,7 +533,15 @@ int run_test(
 
   // Allocate memory for the array then populate it based on the array type
   double *ptr_arr = malloc((size * size) * sizeof(double));
-  populate_array(ptr_arr, size, arr_type);
+
+  // Only core 0 populates the array incase array type 0 is used generating
+  // an array filled with rndom numbers. In this case, each core would generate
+  // a different array. Hence, only core 0 generates the array and then scatters
+  // it to the other cores.
+  if (core_id == 0) {
+    populate_array(ptr_arr, size, arr_type);
+  }
+  MPI_Scatter(ptr_arr, (int)(size * size), MPI_DOUBLE, ptr_arr, (int)(size * size), MPI_DOUBLE, 0, MPI_COMM_WORLD);
   
   // Allocate memory for the input and output arrays for the parallel algorithm.
   // The arrays are copied from the original array to reduce runtime.
@@ -598,7 +609,9 @@ int run_test(
 
     // Check if the sequential and parallel algorithms have produced the same
     // output.
-    has_passed = do_arrays_match(ptr_p_output_arr, ptr_s_output_arr, size, can_print);
+    if (core_id == 0) {
+      has_passed = do_arrays_match(ptr_p_output_arr, ptr_s_output_arr, size, can_print);
+    }
 
     // Prints the sequential arrays.
     if (core_id == 0 && can_print) {
@@ -815,11 +828,6 @@ void compute_parallel(
   }
 
   if (can_print) { printf("Core %d: Gathering Complete\n", core_id); }
-  // The root core broadcasts the output array to all cores to ensure all cores
-  // have the same output array.
-  MPI_Bcast(ptr_out_arr, (int)(size * size), MPI_DOUBLE, 0, MPI_COMM_WORLD);
-
-  if (can_print) { printf("Core %d: Finished\n", core_id); }
 }
 
 void calculate_averages(
@@ -929,6 +937,19 @@ void compute_sequentially(
   }
 }
 
+void populate_array_type_0(
+  double *input_arr,
+  unsigned int const size
+) {
+  // Every element is set to a random value between 0 and 9 inclusive.
+  srand((unsigned int)time(NULL));
+  for (unsigned int j = 0; j < size; j++) {
+    for (unsigned int i = 0; i < size; i++) {
+      unsigned int index = (j * size) + i;
+      input_arr[index] = (double)(rand() % 10);
+    }
+  }
+};
 
 void populate_array_type_1(
   double *input_arr,
@@ -976,7 +997,10 @@ void populate_array(
   unsigned int const type
 ) {
   // Populates the array based on the given type.
-  if (type == 1) {
+  if (type == 0) {
+    // Type 0 sets every element to a random value between 0 and 9 inclusive.
+    populate_array_type_0(input_arr, size);
+  } else if (type == 1) {
     // Type 1 sets the first row and column to 1 and the rest to 0.
     populate_array_type_1(input_arr, size);
   } else if (type == 2) {
