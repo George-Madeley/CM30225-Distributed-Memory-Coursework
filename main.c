@@ -535,13 +535,13 @@ int run_test(
   double *ptr_arr = malloc((size * size) * sizeof(double));
 
   // Only core 0 populates the array incase array type 0 is used generating
-  // an array filled with rndom numbers. In this case, each core would generate
+  // an array filled with random numbers. In this case, each core would generate
   // a different array. Hence, only core 0 generates the array and then scatters
   // it to the other cores.
   if (core_id == 0) {
     populate_array(ptr_arr, size, arr_type);
   }
-  MPI_Scatter(ptr_arr, (int)(size * size), MPI_DOUBLE, ptr_arr, (int)(size * size), MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  MPI_Bcast(ptr_arr, (int)(size * size), MPI_DOUBLE, 0, MPI_COMM_WORLD);
   
   // Allocate memory for the input and output arrays for the parallel algorithm.
   // The arrays are copied from the original array to reduce runtime.
