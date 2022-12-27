@@ -257,14 +257,23 @@ int main(int argc, char **argv)
   }
 
   // Get command line arguments.
-  unsigned int const size = (unsigned int)atoi(argv[1]);
-  double const precision = (double)atof(argv[2]);
-  unsigned int const test_type = (unsigned int)atoi(argv[3]);
-  unsigned int const num_of_tests = (unsigned int)atoi(argv[4]);
-  unsigned int const arr_type = (unsigned int)atoi(argv[5]);
-  unsigned int const can_print = (unsigned int)atoi(argv[6]);
-  unsigned int const do_sequential = (unsigned int)atoi(argv[7]);
+  unsigned int const size = (unsigned int)(abs(atoi(argv[1])));
+  double const precision = (double)(fabs(atof(argv[2])));
+  unsigned int const test_type = (unsigned int)(abs(atoi(argv[3]))) % 3;
+  unsigned int const num_of_tests = (unsigned int)(abs(atoi(argv[4])));
+  unsigned int const arr_type = (unsigned int)(abs(atoi(argv[5]))) % 4;
+  unsigned int const can_print = (unsigned int)(abs(atoi(argv[6]))) % 2;
+  unsigned int const do_sequential = (unsigned int)(abs(atoi(argv[7]))) % 2;
 
+  if (size < 3) {
+    printf("Invalid size. Size must be greater than 2.\n");
+    exit(-1);
+  }
+
+  if (precision < 0.) {
+    printf("Invalid precision. Precision must be greater than 0.\n");
+    exit(-1);
+  }
   // Initialize MPI and check for errors.
   int rc = MPI_Init(&argc, &argv);
   if (rc != MPI_SUCCESS) {
@@ -531,24 +540,25 @@ int run_test(
     return 0;
   }
 
-  // Allocate memory for the array then populate it based on the array type
-  double *ptr_arr = malloc((size * size) * sizeof(double));
+  // Allocate memory for the array.
+  double *ptr_arr = NULL;
+  
+  // Allocate memory for the input and output arrays for the parallel algorithm.
+  // The arrays are copied from the original array to reduce runtime.
+  double *ptr_p_input_arr = NULL;
+  double *ptr_p_output_arr = NULL;
 
   // Only core 0 populates the array incase array type 0 is used generating
   // an array filled with random numbers. In this case, each core would generate
   // a different array. Hence, only core 0 generates the array and then scatters
   // it to the other cores.
   if (core_id == 0) {
+    ptr_arr = malloc((size * size) * sizeof(double));
     populate_array(ptr_arr, size, arr_type);
+    ptr_p_input_arr = ptr_arr;
+    ptr_p_output_arr = malloc((size * size) * sizeof(double));
   }
-  MPI_Bcast(ptr_arr, (int)(size * size), MPI_DOUBLE, 0, MPI_COMM_WORLD);
   
-  // Allocate memory for the input and output arrays for the parallel algorithm.
-  // The arrays are copied from the original array to reduce runtime.
-  double *ptr_p_input_arr  = malloc((size * size) * sizeof(double));
-  double *ptr_p_output_arr = malloc((size * size) * sizeof(double));
-  memcpy(ptr_p_input_arr , ptr_arr, (size * size) * sizeof(double));
-  memcpy(ptr_p_output_arr, ptr_arr, (size * size) * sizeof(double));
 
   // Run the parallel algorithm first as there will be less variance in the
   // start time for each core as less code is executed before the parallel
@@ -579,7 +589,7 @@ int run_test(
   int has_passed = 1;
 
   // If the sequential algorithm is to be run, then run it.
-  if (do_sequential) {
+  if (do_sequential && core_id == 0) {
 
     // Allocate memory for the input and output arrays for the sequential
     // algorithm. The arrays are copied from the original array to reduce
@@ -594,27 +604,19 @@ int run_test(
     compute_sequentially(ptr_s_input_arr, ptr_s_output_arr, size, precision);
     clock_t sequential_time_end = clock();
 
-    // To get a more precise sequential time we need to find the average
-    // sequential time of all the cores.
-    double core_sequential_time = (double)(sequential_time_end - sequential_time_start) / CLOCKS_PER_SEC;
-    double summed_sequential_time;
-    MPI_Reduce(&core_sequential_time, &summed_sequential_time, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+    //Calculates the sequential time
+    *sequential_time = (double)(sequential_time_end - sequential_time_start) / CLOCKS_PER_SEC;
 
-    // Only the first core will have the correct sequential time. So, it
-    // will need to broadcast it to the other cores.
-    if (core_id == 0) {
-      *sequential_time = summed_sequential_time / num_cores;
-    }
+    // Broadcast the sequential time to the other cores.
     MPI_Bcast(sequential_time, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
     // Check if the sequential and parallel algorithms have produced the same
     // output.
-    if (core_id == 0) {
-      has_passed = do_arrays_match(ptr_p_output_arr, ptr_s_output_arr, size, can_print);
-    }
+    has_passed = do_arrays_match(ptr_p_output_arr, ptr_s_output_arr, size, can_print);
+    MPI_Bcast(&has_passed, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
     // Prints the sequential arrays.
-    if (core_id == 0 && can_print) {
+    if (can_print) {
       printf("Sequential Output:\n");
       print_array(ptr_s_output_arr, size, size);
     }
@@ -622,7 +624,14 @@ int run_test(
     // free the memory
     free(ptr_s_output_arr);
     free(ptr_s_input_arr);
+  } else if (do_sequential){
+    // If the sequential algorithm is to be run, but the core is not core 0,
+    // then it will need to receive the sequential time and whether the
+    // sequential and parallel algorithms have produced the same output.
+    MPI_Bcast(sequential_time, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&has_passed, 1, MPI_INT, 0, MPI_COMM_WORLD);
   }
+  
 
   // Prints the  parallel arrays.
   if (core_id == 0 && can_print) {
@@ -631,9 +640,10 @@ int run_test(
   }
 
   // Free the memory
-  free(ptr_p_input_arr);
-  free(ptr_p_output_arr);
-  free(ptr_arr);
+  if (core_id == 0) {
+    free(ptr_p_output_arr);
+    free(ptr_arr);
+  }
 
   // Return whether the sequential and parallel algorithms have produced the
   // same output.
@@ -682,7 +692,40 @@ void compute_parallel(
   // to allow for the core to access the rows above and below it that
   // are allocated to other cores.
   double sub_arr[size * (num_of_rows + 2)];
-  memcpy(&sub_arr[size], &(ptr_in_arr[size * start_row]), sizeof(double) * size * num_of_rows);
+
+  int num_of_ele = (int)(size * num_of_rows);
+
+  // Displacements and counts are used to gather the sub arrays.
+
+  // Displacements are used to determine the starting position of each sub array.
+  int *displs = NULL;
+  // Counts are used to determine the size of each sub array.
+  int *counts = NULL;
+
+  // Th root core gathers all the sub array sizes from each core.
+  if (core_id == 0) {
+    counts = (int *)malloc(sizeof(int) * (unsigned int)num_cores);
+  }
+  MPI_Gather(&num_of_ele, 1, MPI_INT, counts, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+  // The root core calculates the displacements of each sub array.
+  if (core_id == 0) {
+    displs = (int *)malloc(sizeof(int) * (unsigned int)num_cores);
+
+    // The first sub array starts at the beginning of the output array.
+    displs[0] = 0;
+
+    // The displacements of the remaining sub arrays are calculated by adding
+    // the size of the previous sub array to the displacement of the previous
+    // sub array.
+    for (int i = 1; i < num_cores; i++) {
+      displs[i] = displs[i - 1] + counts[i - 1];
+    }
+  }
+
+  // The root core scatters the sub arrays to each core.
+  MPI_Scatterv(ptr_in_arr, counts, displs, MPI_DOUBLE, &sub_arr[size], num_of_ele, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
 
   // Creates two arrays to store the top and bottom rows of the core
   // that are too be sent to the adjacent cores.
@@ -780,51 +823,14 @@ void compute_parallel(
   // of precision. Therefore, the sub array can be copied to the output array.
   // To do this, the root core must gather every sub array from each core.
 
-  // The issue is, some sub arrays are larger than others. Therefore, the
-  // root must gather the larger arrays first, then the smaller ones.
-
-  // For this to be done, the root core gathers the larger arrays first.
-  // Whilst doing so, another core gathers the smaller arrays. Once completed,
-  // a send/receive is sent to the root core containing the gathered smaller arrays.
-
   if (can_print) { printf("Core %d: Gathering Sub Arrays\n", core_id); }
 
-  int count = (int)(size * num_of_rows);
-
-  // Displacements and counts are used to gather the sub arrays.
-
-  // Displacements are used to determine the starting position of each sub array.
-  int *displs = NULL;
-  // Counts are used to determine the size of each sub array.
-  int *recvcounts = NULL;
-
-  // Th root core gathers all the sub array sizes from each core.
-  if (core_id == 0) {
-    recvcounts = (int *)malloc(sizeof(int) * (unsigned int)num_cores);
-  }
-  MPI_Gather(&count, 1, MPI_INT, recvcounts, 1, MPI_INT, 0, MPI_COMM_WORLD);
-
-  // The root core calculates the displacements of each sub array.
-  if (core_id == 0) {
-    displs = (int *)malloc(sizeof(int) * (unsigned int)num_cores);
-
-    // The first sub array starts at the beginning of the output array.
-    displs[0] = 0;
-
-    // The displacements of the remaining sub arrays are calculated by adding
-    // the size of the previous sub array to the displacement of the previous
-    // sub array.
-    for (int i = 1; i < num_cores; i++) {
-      displs[i] = displs[i - 1] + recvcounts[i - 1];
-    }
-  }
-
   // The root core gathers all the sub arrays from each core.
-  MPI_Gatherv(&sub_arr[size], count, MPI_DOUBLE, ptr_out_arr, recvcounts, displs, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  MPI_Gatherv(&sub_arr[size], num_of_ele, MPI_DOUBLE, ptr_out_arr, counts, displs, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
   if (core_id == 0) {
     free(displs);
-    free(recvcounts);
+    free(counts);
   }
 
   if (can_print) { printf("Core %d: Gathering Complete\n", core_id); }
