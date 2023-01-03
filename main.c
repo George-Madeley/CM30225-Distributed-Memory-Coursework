@@ -5,6 +5,23 @@
  *        2D-array. Repeats this process until the difference between the
  *        previous average and current average is less than a given level of
  *        g_precision.
+ * 
+ *        To run the program, the program requires the following arguments in
+ *        the following order:
+ *        1)  (unsigned int)  The size of the square 2D array,
+ *        2)  (double)        The level of precision,
+ *        4)  (unsigned int)  Number of tests to run (must be bigger than 0),
+ *        5)  (unsigned int)  The type of test to run:
+ *                  0: Run the program using he given arguments,
+ *                  1: Test for each level of precision starting at 0.9 to the
+ *                     specified level of precision decreasing logarithmically,
+ *                  2: Test for each array size starting at 10 to the specified
+ *                     array size increasing logarithmically.
+ *        6)  (unsigned int)  Whether to print the input and output arrays:
+ *                  0: Don't print the arrays.
+ *                  1: Print the arrays.
+ *       7)  (unsigned int)   Whether to run the sequential version of the
+ *                            algorithm:
  * @version 0.1
  * @date 2023-01-09
  * 
@@ -30,6 +47,7 @@
  * @param arr_type      The type of array to use.
  * @param num_of_tests  The number of tests to conduct.
  * @param can_print     Whether or not to print the arrays.
+ * @param do_sequential Whether or not to run the sequential version of the algorithm.
  * @param precision     The precision to use.
  */
 void run_static_test(
@@ -50,6 +68,7 @@ void run_static_test(
  * @param arr_type      The type of array to use.
  * @param num_of_tests  The number of tests to conduct.
  * @param can_print     Whether or not to print the arrays.
+ * @param do_sequential Whether or not to run the sequential version of the algorithm.
  * @param precision     The precision to use.
  */
 void run_precision_tests(
@@ -69,6 +88,7 @@ void run_precision_tests(
  * @param arr_type      The type of array to use.
  * @param num_of_tests  The number of tests to conduct.
  * @param can_print     Whether or not to print the arrays.
+ * @param do_sequential Whether or not to run the sequential version of the algorithm.
  * @param precision     The precision to use.
  */
 void run_arr_size_tests(
@@ -89,6 +109,7 @@ void run_arr_size_tests(
  * @param arr_type                  The type of array to use.
  * @param num_of_tests              The number of tests to conduct.
  * @param can_print                 Whether or not to print the arrays.
+ * @param do_sequential             Whether or not to run the sequential version of the algorithm.
  * @param average_parallel_time     The average time taken for the parallel
  *                                  version of the algorithm.                     
  * @param average_sequential_time   The average time taken for the sequential
@@ -115,6 +136,7 @@ int run_tests(
  * @param size            The size of the array.
  * @param arr_type        The type of array to use.
  * @param can_print       Whether or not to print the arrays.
+ * @param do_sequential   Whether or not to run the sequential version of the algorithm.
  * @param parallel_time   The time taken for the parallel version of the algorithm.
  * @param sequential_time The time taken for the sequential version of the
  *                        algorithm.
@@ -141,6 +163,7 @@ int run_test(
  * @param ptr_in_arr  A pointer to the input array.
  * @param ptr_out_arr A pointer to the output array.
  * @param precision   The precision to use.
+ * @param can_print   Whether or not to print the arrays.
  * @param size        The size of the array.
  */
 void compute_parallel(
@@ -201,6 +224,51 @@ void populate_array(
   double *input_arr,
   unsigned int const size,
   unsigned int const type
+);
+
+/**
+ * @brief Populates an array with random values.
+ * 
+ * @param input_arr A pointer to the array to populate.
+ * @param size      The size of the array.
+ */
+void populate_array_type_0(
+  double *input_arr,
+  unsigned int const size
+);
+
+/**
+ * @brief Populates the array by setting the first row and column to 1 and the
+ *       rest to 0.
+ * 
+ * @param input_arr A pointer to the array to populate.
+ * @param size      The size of the array.
+ */
+void populate_array_type_1(
+  double *input_arr,
+  unsigned int const size
+);
+
+/**
+ * @brief Populates the given array by setting each elements value to its y-coordinate.
+ * 
+ * @param input_arr A pointer to the array to populate.
+ * @param size      The size of the array.
+ */
+void populate_array_type_2(
+  double *input_arr,
+  unsigned int const size
+);
+
+/**
+ * @brief Populates the array by setting the first row to 1s and the rest to 0s.
+ * 
+ * @param input_arr A pointer to the array to populate.
+ * @param size      The size of the array.
+ */
+void populate_array_type_3(
+  double *input_arr,
+  unsigned int const size
 );
 
 /**
@@ -319,7 +387,9 @@ void run_static_test(
   int core_id;
   MPI_Comm_rank(MPI_COMM_WORLD, &core_id);
 
-  // Print the header for the results.
+  // Core 0 prints the results of the test in a CSV like style. When the data
+  // is written to the .out file, the data can be easily interpreted as a CSV
+  // file by Excel.
   if (core_id == 0) {
     printf("Num of Cores,\tSize,\tArr Type,\tPrecision,\tPass/Fail,\tSequential Time (s),\tParallel Time (s)\n");
   }
@@ -367,7 +437,9 @@ void run_precision_tests(
   int core_id;
   MPI_Comm_rank(MPI_COMM_WORLD, &core_id);
 
-  // Print the header for the results.
+  // Core 0 prints the results of the test in a CSV like style. When the data
+  // is written to the .out file, the data can be easily interpreted as a CSV
+  // file by Excel.
   if (core_id == 0) {
     printf("Num of Cores,\tSize,\tArr Type,\tPrecision,\tPass/Fail,\tSequential Time (s),\tParallel Time (s)\n");
   }
@@ -427,7 +499,9 @@ void run_arr_size_tests(
   int core_id;
   MPI_Comm_rank(MPI_COMM_WORLD, &core_id);
 
-  // Print the header for the results.
+  // Core 0 prints the results of the test in a CSV like style. When the data
+  // is written to the .out file, the data can be easily interpreted as a CSV
+  // file by Excel.
   if (core_id == 0) {
     printf("Num of Cores,\tSize,\tArr Type,\tPrecision,\tPass/Fail,\tSequential Time (s),\tParallel Time (s)\n");
   }
@@ -490,7 +564,8 @@ int run_tests(
   // have passed.
   int average_has_passed = 1;
 
-  // Run the tests a given number of times.
+  // Run the tests a given number of times to calculate an average runtime for
+  // the sequential and parallel implementations.
   for(unsigned int test_num = 0; test_num < num_of_tests; test_num++) {
     // Run the test and get the sequential and parallel times.
     double sequential_time = 0.;
@@ -536,15 +611,20 @@ int run_test(
   MPI_Comm_rank(MPI_COMM_WORLD, &core_id);
   MPI_Comm_size(MPI_COMM_WORLD, &num_cores);
 
+  // If the number of cores is larger than the size of the array, the rows of
+  // the array cannot be equally divided up amongst the cores. The algorithm
+  // could use a proportion of the cores in use but this would reduce the
+  // overall efficiency of the algorithm at that number of cores. Therefore,
+  // return 0 stating the parallel and sequential arrays did not match
+  // resulting in a failed test.
   if (num_cores > (int)size) {
     return 0;
   }
 
-  // Allocate memory for the array.
+  // Create pointers to the arrays. Scatter and Gather will use this later to
+  // scatter and gather data from the 0th core which contains the populated
+  // data.
   double *ptr_arr = NULL;
-  
-  // Allocate memory for the input and output arrays for the parallel algorithm.
-  // The arrays are copied from the original array to reduce runtime.
   double *ptr_p_input_arr = NULL;
   double *ptr_p_output_arr = NULL;
 
@@ -552,6 +632,9 @@ int run_test(
   // an array filled with random numbers. In this case, each core would generate
   // a different array. Hence, only core 0 generates the array and then scatters
   // it to the other cores.
+
+  // This also reduces the amount of memory taken up by the program in each
+  // cores memory.
   if (core_id == 0) {
     ptr_arr = malloc((size * size) * sizeof(double));
     populate_array(ptr_arr, size, arr_type);
@@ -585,10 +668,15 @@ int run_test(
   // As the sequential algorithm is optional to reduce batch testing run time,
   // we assume that the tests have passed. This will be overwritten if the
   // sequential is run and the comparision of the sequential and parallel
-  // arrays do not match.
+  // arrays do not match. This does run the risk of not being informed when
+  // the sequential and parallel arrays do not match however, rigorous testing
+  // should prove that the parallel and sequential arrays match and now one
+  // can batch test to calculate parallel runtime.
   int has_passed = 1;
 
-  // If the sequential algorithm is to be run, then run it.
+  // If the sequential algorithm is to be run, then run it. However, only the
+  // 0th core should run it as it holds the original arrays and broadcasting
+  // square arrays of doubles bigger than 16,000 x 16,000 is not feasible.
   if (do_sequential && core_id == 0) {
 
     // Allocate memory for the input and output arrays for the sequential
@@ -611,7 +699,9 @@ int run_test(
     MPI_Bcast(sequential_time, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
     // Check if the sequential and parallel algorithms have produced the same
-    // output.
+    // output. If has_passed is 1, then the arrays match and the parallel
+    // output is assumed correct. Else, the parallel output is assumed
+    // incorrect.
     has_passed = do_arrays_match(ptr_p_output_arr, ptr_s_output_arr, size, can_print);
     MPI_Bcast(&has_passed, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
@@ -625,7 +715,7 @@ int run_test(
     free(ptr_s_output_arr);
     free(ptr_s_input_arr);
   } else if (do_sequential){
-    // If the sequential algorithm is to be run, but the core is not core 0,
+    // If the sequential algorithm is to be run, but the core rank is not 0,
     // then it will need to receive the sequential time and whether the
     // sequential and parallel algorithms have produced the same output.
     MPI_Bcast(sequential_time, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
@@ -670,45 +760,84 @@ void compute_parallel(
   
   MPI_Status status;
 
+  // Each row in the array is divided up amongst the cores. Each core has the
+  // index of the row it starts and ends on. However, for arrays which cannot
+  // be equally divided, the remaining rows will be distributed amongst the
+  // first x number of cores; where x is the number of remaining rows.
+
   // Calculate the minimum number of rows that each core will be responsible
   // for.
-  unsigned int rows_per_core = (unsigned int)floor(size / (unsigned int)num_cores);
+  unsigned int min_num_of_rows = (unsigned int)floor(size / (unsigned int)num_cores);
+
   // Calculate the number of rows that will be left over.
   unsigned int remainder_rows = size % (unsigned int)num_cores;
-  // Calculate the start and end row for this core.
-  unsigned int start_row = (unsigned int)core_id < remainder_rows ? (unsigned int)core_id * (rows_per_core + 1) : (unsigned int)core_id * rows_per_core + remainder_rows;
-  unsigned int end_row = (unsigned int)core_id < remainder_rows ? start_row + rows_per_core : start_row + rows_per_core - 1;
-  // Calculate the number of rows this core will be responsible for.
+
+  // Calculate the y-index for the row the core will start and end on. This
+  // will be different depending on the number of remaining rows there are
+  // and whether the core has been allocated an extra row.
+  unsigned int start_row;
+  unsigned int end_row;
+  if ((unsigned int)core_id < remainder_rows) {
+    start_row = (unsigned int)core_id * (min_num_of_rows + 1);
+    end_row = start_row + min_num_of_rows;
+  } else {
+    start_row = (unsigned int)core_id * min_num_of_rows + remainder_rows;
+    end_row = start_row + min_num_of_rows - 1;
+  }
+  
+  // Calculate the number of rows this core will be responsible for. This is
+  // different to min_num_of_rows as this will include the extra row if there
+  // are remainder rows to calculate for.
   unsigned int num_of_rows = end_row + 1 - start_row;
-  // Calculate the core id of the core above and below this core.
+
+  // Calculate the core id of the core above and below this core so the core
+  // can send/receive data to/from these cores. The prev_core_id for the
+  // first core will be set to the last core and the next_core_id for the
+  // last core will be set to the first core. The first and last core wont
+  // use the data from sent from the other core as they do not calculate
+  // the averages of the top and bottom row respectfully. This is done to
+  // improve the simplicity of the row sharing computation.
   int next_core_id = (core_id + 1) % num_cores;
   int prev_core_id = core_id != 0 ? core_id - 1 : num_cores - 1;
+
   // Calculate the number of rows that the core above and below this core
   unsigned int is_precise = 0;
 
-  if (can_print) { printf("Core %d: Start Row: %d, End Row: %d, Num of Rows: %d, next core: %d, prev core: %d\n", core_id, start_row, end_row, num_of_rows, next_core_id, prev_core_id); }
-  // Create an array to hold the allocated rows of the input array.
-  // This is padded by one row at the top and another at the bottom
-  // to allow for the core to access the rows above and below it that
-  // are allocated to other cores.
+  // Used for debugging
+  if (can_print) {
+    printf("Core %d: Start Row: %d, End Row: %d, Num of Rows: %d, next core: %d, prev core: %d\n", 
+      core_id, start_row, end_row, num_of_rows, next_core_id, prev_core_id
+    );
+  }
+  
+  // Create an array to hold the allocated rows of the input array. The array
+  // is padded by one row at the top and bottom. This is to store the row sent
+  // to them by neighboring cores.
   double sub_arr[size * (num_of_rows + 2)];
 
+  // Calculates the number of elements the core is responsible for.
   int num_of_ele = (int)(size * num_of_rows);
 
-  // Displacements and counts are used to gather the sub arrays.
+  // Before each core can share their rows, the need to receive the data from
+  // the root core. However, as some cores have more rows than others, the root
+  // core will need to use a variable scatter to scatter the rows amongst the
+  // cores. To compute a variable scatter, the root core will require a list of
+  // the number of elements each core is responsible for (called counts) and a
+  // list of start indexes of where the rows can be round relative to the array
+  // (called displs). Both lists should be in rank order.
 
-  // Displacements are used to determine the starting position of each sub array.
+  // Creates pointers for the counts and displs array.
   int *displs = NULL;
-  // Counts are used to determine the size of each sub array.
   int *counts = NULL;
 
-  // Th root core gathers all the sub array sizes from each core.
+  // The root core gathers the number of elements each core is responsible for.
   if (core_id == 0) {
     counts = (int *)malloc(sizeof(int) * (unsigned int)num_cores);
   }
   MPI_Gather(&num_of_ele, 1, MPI_INT, counts, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-  // The root core calculates the displacements of each sub array.
+  // The root core calculates where in the input array each cores elements can
+  // be found.
   if (core_id == 0) {
     displs = (int *)malloc(sizeof(int) * (unsigned int)num_cores);
 
@@ -724,13 +853,17 @@ void compute_parallel(
   }
 
   // The root core scatters the sub arrays to each core.
-  MPI_Scatterv(ptr_in_arr, counts, displs, MPI_DOUBLE, &sub_arr[size], num_of_ele, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  MPI_Scatterv(
+    ptr_in_arr, counts, displs, MPI_DOUBLE,
+    &sub_arr[size], num_of_ele, MPI_DOUBLE, 
+    0, MPI_COMM_WORLD
+  );
 
 
-  // Creates two arrays to store the top and bottom rows of the core
-  // that are too be sent to the adjacent cores.
-  double core_top_row[size];
-  double core_bot_row[size];
+  // Creates pointers to where the top and bottom rows can be found. This is to
+  // send the top and bottom rows to the prev and next core respectfully.
+  double *core_top_row = &sub_arr[size];;
+  double *core_bot_row = &sub_arr[size * num_of_rows];
 
   if (can_print) { printf("Core %d: Beginning Iterations\n", core_id); }
   // Runs the algorithm until the required precision is met.
@@ -738,11 +871,6 @@ void compute_parallel(
     // Make the assumption that all values in the sub_arr have already
     // met the required precision.
     is_precise = 1;
-
-    // Copy each cores top and bottom rows to a space in memory
-    // ready to be sent to their neighboring cores.
-    memcpy(core_top_row, &sub_arr[size], sizeof(double) * size);
-    memcpy(core_bot_row, &sub_arr[size * num_of_rows], sizeof(double) * size);
 
     // If there is only one core, then there is no need to pass messages.
     // A loop is used to determine which core is sending data, which core
@@ -771,15 +899,27 @@ void compute_parallel(
 
         if (core_id == prev_core_num) {
           // Wait to receive a row from the next core.
-          MPI_Recv(&sub_arr[size * (num_of_rows + 1)], (int)size, MPI_DOUBLE, next_core_id, core_num, MPI_COMM_WORLD, &status);
+          MPI_Recv(
+            &sub_arr[size * (num_of_rows + 1)], (int)size, MPI_DOUBLE,
+            next_core_id, core_num, MPI_COMM_WORLD, &status
+          );
         } else if (core_id == core_num) {
           // Send the top row to the previous core.
-          MPI_Send(core_top_row, (int)size, MPI_DOUBLE, prev_core_id, core_num, MPI_COMM_WORLD);
+          MPI_Send(
+            core_top_row, (int)size, MPI_DOUBLE,
+            prev_core_id, core_num, MPI_COMM_WORLD
+          );
           // Send the bottom row to the next core.
-          MPI_Send(core_bot_row, (int)size, MPI_DOUBLE, next_core_id, core_num, MPI_COMM_WORLD);
+          MPI_Send(
+            core_bot_row, (int)size, MPI_DOUBLE,
+            next_core_id, core_num, MPI_COMM_WORLD
+          );
         } else if (core_id == next_core_num) {
           // Wait to receive a row from the previous core.
-          MPI_Recv(&sub_arr[0], (int)size, MPI_DOUBLE, prev_core_id, core_num, MPI_COMM_WORLD, &status);
+          MPI_Recv(
+            &sub_arr[0], (int)size, MPI_DOUBLE,
+            prev_core_id, core_num, MPI_COMM_WORLD, &status
+          );
         } else {
           continue;
         }
@@ -804,14 +944,15 @@ void compute_parallel(
     // Copy the averages to the sub array.
     memcpy(&sub_arr[size], avg_arr, sizeof(double) * size * num_of_rows);
 
+    // Used for Debugging.
+    if (can_print) { printf("Core %d: Checking Precision\n", core_id); }
+
     // Some cores may have reached the required level of precision before
     // others. To ensure the cores that have reached the required level of
     // precision still communicate with their neighboring cores, the root
     // core must gather the is_precise values from each core, use a MIN
     // to check if all cores have reached the required level of precision
     // and then broadcast the result to all cores.
-    if (can_print) { printf("Core %d: Checking Precision\n", core_id); }
-
     unsigned int global_is_precise = 0;
     MPI_Reduce(&is_precise, &global_is_precise, 1, MPI_UNSIGNED, MPI_MIN, 0, MPI_COMM_WORLD);
     is_precise = global_is_precise == 1 ? 1 : 0;
@@ -819,20 +960,24 @@ void compute_parallel(
 
 
   }
+
+  // Used for debugging
+  if (can_print) { printf("Core %d: Gathering Sub Arrays\n", core_id); }
+
   // Every value within the cores sub array has reached the required level
   // of precision. Therefore, the sub array can be copied to the output array.
   // To do this, the root core must gather every sub array from each core.
 
-  if (can_print) { printf("Core %d: Gathering Sub Arrays\n", core_id); }
-
-  // The root core gathers all the sub arrays from each core.
   MPI_Gatherv(&sub_arr[size], num_of_ele, MPI_DOUBLE, ptr_out_arr, counts, displs, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
+  // The root core frees up memory taken up by the gatherv and scatterv
+  // requirements.
   if (core_id == 0) {
     free(displs);
     free(counts);
   }
 
+  // used for debugging
   if (can_print) { printf("Core %d: Gathering Complete\n", core_id); }
 }
 
@@ -948,6 +1093,8 @@ void populate_array_type_0(
   unsigned int const size
 ) {
   // Every element is set to a random value between 0 and 9 inclusive.
+
+  // This is great to stress test the program.
   srand((unsigned int)time(NULL));
   for (unsigned int j = 0; j < size; j++) {
     for (unsigned int i = 0; i < size; i++) {
@@ -962,6 +1109,8 @@ void populate_array_type_1(
   unsigned int const size
 ) {
   // Sets the first row and column to 1 and the rest to 0.
+
+  // This is just the example in the assignment description.
   for (unsigned int j = 0; j < size; j++) {
     for (unsigned int i = 0; i < size; i++) {
       unsigned int index = (j * size) + i;
@@ -979,6 +1128,12 @@ void populate_array_type_2(
   unsigned int const size
 ) {
   // Sets each elements value to its y coordinate.
+
+  // This is great to run only a single iteration as the average of each
+  // elements neighbors will be the same every iteration. Therefore, the
+  // difference between the current value and the average will always be 0
+  // causing the program only to run one iteration regardless of the level
+  // of precision.
   for (unsigned int j = 0; j < size; j++) {
     for (unsigned int i = 0; i < size; i++) {
       unsigned int index = (j * size) + i;
@@ -992,6 +1147,9 @@ void populate_array_type_3(
   unsigned int const size
 ) {
   // Sets the top row to 1 and the rest to 0.
+
+  // This is great to see how many iterations have occurred as the number of
+  // iterations is proportional to the number of rows that are not 0 minus 1.
   for (unsigned int i = 0; i < size; i++) {
     input_arr[i] = 1.;
   }
